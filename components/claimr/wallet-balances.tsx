@@ -1,0 +1,59 @@
+"use client"
+
+import { Wallet } from "lucide-react"
+
+export function WalletBalances() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* USDC Balance Card */}
+      <div className="glass-card rounded-xl p-6 relative overflow-hidden group">
+        <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#2D6EFF]/20 rounded-full blur-3xl group-hover:bg-[#2D6EFF]/30 transition-all duration-500" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-full bg-[#2D6EFF]/20 flex items-center justify-center">
+              <span className="text-lg font-bold text-[#2D6EFF]">$</span>
+            </div>
+            <span className="text-muted-foreground text-sm">USDC Balance</span>
+          </div>
+          <p className="text-3xl font-bold text-foreground mb-1">1,240.00 USDC</p>
+          <p className="text-sm text-muted-foreground mb-4">≈ $1,240.00 USD</p>
+          <button className="px-4 py-2 rounded-lg border border-[#2D6EFF] text-[#2D6EFF] text-sm font-medium hover:bg-[#2D6EFF]/10 transition-colors">
+            Withdraw
+          </button>
+        </div>
+      </div>
+
+      {/* EURC Balance Card */}
+      <div className="glass-card rounded-xl p-6 relative overflow-hidden group">
+        <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#FF2D7A]/20 rounded-full blur-3xl group-hover:bg-[#FF2D7A]/30 transition-all duration-500" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-full bg-[#FF2D7A]/20 flex items-center justify-center">
+              <span className="text-lg font-bold text-[#FF2D7A]">€</span>
+            </div>
+            <span className="text-muted-foreground text-sm">EURC Balance</span>
+          </div>
+          <p className="text-3xl font-bold text-foreground mb-1">320.00 EURC</p>
+          <p className="text-sm text-muted-foreground mb-4">≈ $348.00 USD</p>
+          <button className="px-4 py-2 rounded-lg border border-[#FF2D7A] text-[#FF2D7A] text-sm font-medium hover:bg-[#FF2D7A]/10 transition-colors">
+            Withdraw
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function WalletHeader() {
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-3 mb-2">
+        <Wallet className="w-6 h-6 text-[#FF2D7A]" />
+        <h1 className="text-2xl font-bold text-foreground">Your Wallet</h1>
+      </div>
+      <p className="text-muted-foreground text-sm">
+        Embedded wallet powered by Circle. Export your private key anytime in Settings.
+      </p>
+    </div>
+  )
+}
