@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, Briefcase, Vault, BarChart3, Settings, BadgeCheck } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, PlusCircle, Briefcase, Vault, BarChart3, Settings, BadgeCheck, LogOut } from "lucide-react";
+import { useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/project" },
@@ -15,10 +18,27 @@ const menuItems = [
 
 export function ProjectSidebar() {
   const pathname = usePathname();
+  const { user, logout, authenticated } = usePrivy();
+  const { address } = useAccount();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const displayName = user?.email?.address
+    || user?.twitter?.username && `@${user.twitter.username}`
+    || address && `${address.slice(0, 6)}...${address.slice(-4)}`
+    || "Project";
+
+  const avatarLetter = displayName.slice(0, 1).toUpperCase();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/");
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col border-r border-border/50 bg-background/80 backdrop-blur-xl">
-      {/* Logo */}
       <div className="p-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#FF2D7A] to-[#2D6EFF]" />
@@ -26,7 +46,6 @@ export function ProjectSidebar() {
         </Link>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
           {menuItems.map((item) => {
@@ -50,25 +69,33 @@ export function ProjectSidebar() {
         </ul>
       </nav>
 
-      {/* Company Profile */}
-      <div className="border-t border-border/50 p-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2D6EFF] to-[#FF2D7A] p-[2px]">
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-background text-sm font-bold">
-              AS
+      {mounted ? (
+        <div className="border-t border-border/50 p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#2D6EFF] to-[#FF2D7A] flex items-center justify-center text-sm font-bold text-white shrink-0">
+              {avatarLetter}
             </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-medium text-foreground truncate">ArcSwap Protocol</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <BadgeCheck className="h-3.5 w-3.5 text-[#2D6EFF]" />
+                <p className="text-xs text-[#2D6EFF]">
+                  {authenticated ? "Verified Project" : "Connected"}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <BadgeCheck className="h-3.5 w-3.5 text-[#2D6EFF]" />
-              <p className="text-xs text-[#2D6EFF]">Verified Project</p>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="border-t border-border/50 p-4 h-[72px]" />
+      )}
     </aside>
   );
 }

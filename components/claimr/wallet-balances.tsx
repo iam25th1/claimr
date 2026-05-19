@@ -1,8 +1,30 @@
 "use client"
 
 import { Wallet } from "lucide-react"
+import { useAccount, useReadContract } from "wagmi"
+import { formatUnits } from "viem"
+import { USDC_ADDRESS, EURC_ADDRESS, USDC_ABI } from "@/lib/contracts"
 
 export function WalletBalances() {
+  const { address } = useAccount()
+
+  const { data: usdcRaw } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: USDC_ABI,
+    functionName: "balanceOf",
+    args: [address ?? "0x0000000000000000000000000000000000000000"],
+  })
+
+  const { data: eurcRaw } = useReadContract({
+    address: EURC_ADDRESS,
+    abi: USDC_ABI, // same ERC-20 interface
+    functionName: "balanceOf",
+    args: [address ?? "0x0000000000000000000000000000000000000000"],
+  })
+
+  const usdcBalance = usdcRaw ? Number(formatUnits(usdcRaw as bigint, 6)).toFixed(2) : "0.00"
+  const eurcBalance = eurcRaw ? Number(formatUnits(eurcRaw as bigint, 6)).toFixed(2) : "0.00"
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* USDC Balance Card */}
@@ -15,8 +37,8 @@ export function WalletBalances() {
             </div>
             <span className="text-muted-foreground text-sm">USDC Balance</span>
           </div>
-          <p className="text-3xl font-bold text-foreground mb-1">1,240.00 USDC</p>
-          <p className="text-sm text-muted-foreground mb-4">≈ $1,240.00 USD</p>
+          <p className="text-3xl font-bold text-foreground mb-1">{usdcBalance} USDC</p>
+          <p className="text-sm text-muted-foreground mb-4">≈ ${usdcBalance} USD</p>
           <button className="px-4 py-2 rounded-lg border border-[#2D6EFF] text-[#2D6EFF] text-sm font-medium hover:bg-[#2D6EFF]/10 transition-colors">
             Withdraw
           </button>
@@ -33,8 +55,8 @@ export function WalletBalances() {
             </div>
             <span className="text-muted-foreground text-sm">EURC Balance</span>
           </div>
-          <p className="text-3xl font-bold text-foreground mb-1">320.00 EURC</p>
-          <p className="text-sm text-muted-foreground mb-4">≈ $348.00 USD</p>
+          <p className="text-3xl font-bold text-foreground mb-1">{eurcBalance} EURC</p>
+          <p className="text-sm text-muted-foreground mb-4">≈ ${(Number(eurcBalance) * 1.08).toFixed(2)} USD</p>
           <button className="px-4 py-2 rounded-lg border border-[#FF2D7A] text-[#FF2D7A] text-sm font-medium hover:bg-[#FF2D7A]/10 transition-colors">
             Withdraw
           </button>

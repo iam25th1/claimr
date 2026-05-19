@@ -9,8 +9,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.0",
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@hookform/resolvers": "^3.9.1",
-    "@vercel/analytics": "1.6.1",
+    "@privy-io/react-auth": "^3.26.0",
+    "@privy-io/wagmi": "^4.0.7",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -38,6 +41,8 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
+    "@tanstack/react-query": "^5.100.10",
+    "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -57,6 +62,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
+    "viem": "^2.49.3",
+    "wagmi": "^3.6.15",
     "zod": "^3.24.1"
   },
   "devDependencies": {

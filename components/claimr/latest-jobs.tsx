@@ -1,104 +1,124 @@
-import { Clock } from "lucide-react"
+"use client";
 
-const latestJobs = [
-  {
-    id: 1,
-    project: "ArcSwap",
-    avatar: "A",
-    title: "Tweet about DEX launch",
-    pay: 200,
-    criteria: "3 tweets • 50K impressions",
-    days: 7,
-    tags: ["KOL", "X Posts"],
-    color: "#FF2D7A",
-  },
-  {
-    id: 2,
-    project: "Neon Protocol",
-    avatar: "N",
-    title: "Thread on bridging",
-    pay: 150,
-    criteria: "1 thread • 10K impressions",
-    days: 5,
-    tags: ["Writing", "X Posts"],
-    color: "#2D6EFF",
-  },
-  {
-    id: 3,
-    project: "CircleFi",
-    avatar: "C",
-    title: "Ambassador program post",
-    pay: 300,
-    criteria: "1 post • 15K reach",
-    days: 10,
-    tags: ["KOL", "Writing"],
-    color: "#10B981",
-  },
-  {
-    id: 4,
-    project: "ArcDAO",
-    avatar: "A",
-    title: "Community update tweet",
-    pay: 100,
-    criteria: "2 tweets • 5K impressions",
-    days: 3,
-    tags: ["Writing", "X Posts"],
-    color: "#8B5CF6",
-  },
-]
+import { useRouter } from "next/navigation";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { Clock } from "lucide-react";
+import { CLAIMR_ESCROW_ADDRESS as CLAIMR_ADDRESS, CLAIMR_ABI } from "@/lib/contracts";
+import { useJobs } from "@/lib/useJobs";
+import { useState, useEffect } from "react";
+
+const COLORS = ["#FF2D7A", "#2D6EFF", "#10B981", "#8B5CF6", "#F59E0B", "#06B6D4"];
 
 export function LatestJobs() {
+  const { isConnected } = useAccount();
+  const router = useRouter();
+  const [claimingId, setClaimingId] = useState<number | null>(null);
+  const { jobs, isLoading } = useJobs();
+
+  const { writeContract, data: hash, isPending, status } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  // All open jobs except the first 2 (those are Featured)
+  const latestJobs = jobs.filter((j) => j.status === 0).slice(2);
+
+  useEffect(() => {
+    if (isSuccess) {
+      setClaimingId(null);
+      router.push("/dashboard/my-jobs");
+    }
+  }, [isSuccess, router]);
+
+  useEffect(() => {
+    if (status === "error") setClaimingId(null);
+  }, [status]);
+
+  const handleClaim = (jobId: number) => {
+    if (!isConnected) {
+      router.push("/onboarding?role=creator");
+      return;
+    }
+    setClaimingId(jobId);
+    writeContract({
+      address: CLAIMR_ADDRESS,
+      abi: CLAIMR_ABI,
+      functionName: "claimJob",
+      args: [BigInt(jobId)],
+    });
+  };
+
+  const isJobLoading = (jobId: number) =>
+    claimingId === jobId && (isPending || isConfirming);
+
+  if (isLoading) return null;
+
+  if (latestJobs.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">Latest Jobs</h2>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <p className="text-muted-foreground">No more open jobs right now.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">Latest Jobs</h2>
       <div className="grid gap-4 sm:grid-cols-2">
-        {latestJobs.map((job) => (
-          <div
-            key={job.id}
-            className="group rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm transition-all hover:border-white/20"
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-base font-bold text-white"
-                style={{ backgroundColor: `${job.color}20`, color: job.color }}
-              >
-                {job.avatar}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">{job.project}</p>
-                  <span className="text-base font-bold text-green-400">{job.pay} USDC</span>
-                </div>
-                <h3 className="mt-1 font-medium text-foreground">{job.title}</h3>
+        {latestJobs.map((job, index) => {
+          const color = COLORS[index % COLORS.length];
+          const daysLeft = Math.max(
+            0,
+            Math.ceil((job.deadline * 1000 - Date.now()) / (1000 * 60 * 60 * 24))
+          );
 
-                <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
-                  <span>{job.criteria}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {job.days}d left
-                  </span>
+          return (
+            <div
+              key={job.id}
+              className="group rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm transition-all hover:border-white/20"
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-base font-bold"
+                  style={{ backgroundColor: `${color}20`, color }}
+                >
+                  {job.project.slice(2, 4).toUpperCase()}
                 </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex gap-2">
-                    {job.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-white/5 px-2 py-1 text-xs text-muted-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground font-mono">
+                      {job.project.slice(0, 6)}...{job.project.slice(-4)}
+                    </p>
+                    <span className="text-base font-bold text-green-400">
+                      {job.amount} USDC
+                    </span>
                   </div>
-                  <button className="rounded-lg bg-[#FF2D7A] px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-[#FF2D7A]/90">
-                    Claim Job
-                  </button>
+                  <h3 className="mt-1 font-medium text-foreground">{job.title}</h3>
+
+                  <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
+                    <span>{job.criteria}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {daysLeft}d left
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end">
+                    <button
+                      onClick={() => handleClaim(job.id)}
+                      disabled={isJobLoading(job.id)}
+                      className="rounded-lg bg-[#FF2D7A] px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-[#FF2D7A]/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isJobLoading(job.id) ? "Claiming..." : "Claim Job"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
-  )
+  );
 }

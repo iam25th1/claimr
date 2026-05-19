@@ -4,13 +4,15 @@ import { TransactionsList } from "@/components/claimr/transactions-list"
 
 export default function WalletPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <WalletHeader />
       <WalletBalances />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SwapCard />
-        <TransactionsList />
+      <TransactionsList />
+      <div className="border-t border-white/10 pt-6">
+        <p className="text-sm text-muted-foreground mb-4">Convert between stablecoins</p>
+        <div className="max-w-md">
+          <SwapCard />
+        </div>
       </div>
     </div>
   )
