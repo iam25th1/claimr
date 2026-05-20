@@ -1,66 +1,58 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { useState } from "react"
 import { parseUnits } from "viem"
 import { ArrowDownUp } from "lucide-react"
-import { USDC_ADDRESS, EURC_ADDRESS, USDC_ABI, STARLIGHT_POOL_ADDRESS, POOL_ABI } from "@/lib/contracts"
+import { USDC_ADDRESS, EURC_ADDRESS, STARLIGHT_POOL_ADDRESS } from "@/lib/contracts"
+import { useAuth } from "@/lib/auth"
+import { useCircleWrite } from "@/lib/useCircleWrite"
 
 export function SwapCard() {
-  const { isConnected } = useAccount()
+  const { authenticated } = useAuth()
   const [fromToken, setFromToken] = useState<"USDC" | "EURC">("USDC")
   const [amount, setAmount] = useState("")
   const [step, setStep] = useState<"idle" | "approving" | "swapping" | "done">("idle")
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const toToken = fromToken === "USDC" ? "EURC" : "USDC"
   const tokenInAddress = fromToken === "USDC" ? USDC_ADDRESS : EURC_ADDRESS
   const estimatedOut = amount ? (Number(amount) * 0.918).toFixed(2) : "0.00"
 
-  const { writeContract: approve, data: approveHash, error: approveError } = useWriteContract()
-  const { writeContract: swap, data: swapHash, error: swapError } = useWriteContract()
+  const { execute } = useCircleWrite()
 
-  const { isLoading: isApproving, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash })
-  const { isLoading: isSwapping, isSuccess: swapSuccess } = useWaitForTransactionReceipt({ hash: swapHash })
+  const handleSwap = async () => {
+    if (!authenticated || !amount || Number(amount) <= 0) return
+    setErrorMsg(null)
 
-  // After approve confirms, trigger swap
-  useEffect(() => {
-    if (approveSuccess && step === "approving") {
-      setStep("swapping")
-      swap({
-        address: STARLIGHT_POOL_ADDRESS,
-        abi: POOL_ABI,
-        functionName: "swap",
-        args: [tokenInAddress, parseUnits(amount || "0", 6)],
+    const amountWei = parseUnits(amount, 6)
+
+    try {
+      setStep("approving")
+      await execute({
+        contractAddress: tokenInAddress,
+        abiFunctionSignature: "approve(address,uint256)",
+        abiParameters: [STARLIGHT_POOL_ADDRESS, amountWei.toString()],
       })
-    }
-  }, [approveSuccess])
 
-  useEffect(() => {
-    if (swapSuccess) {
+      setStep("swapping")
+      await execute({
+        contractAddress: STARLIGHT_POOL_ADDRESS,
+        abiFunctionSignature: "swap(address,uint256)",
+        abiParameters: [tokenInAddress, amountWei.toString()],
+      })
+
       setStep("done")
       setAmount("")
       setTimeout(() => setStep("idle"), 3000)
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? "Swap failed")
+      setStep("idle")
     }
-  }, [swapSuccess])
-
-  useEffect(() => {
-    if (approveError || swapError) setStep("idle")
-  }, [approveError, swapError])
-
-  const handleSwap = () => {
-    if (!isConnected || !amount || Number(amount) <= 0) return
-    setStep("approving")
-    approve({
-      address: tokenInAddress,
-      abi: USDC_ABI,
-      functionName: "approve",
-      args: [STARLIGHT_POOL_ADDRESS, parseUnits(amount, 6)],
-    })
   }
 
   const getButtonLabel = () => {
-    if (step === "approving" && isApproving) return "Approving..."
-    if (step === "swapping" && isSwapping) return "Swapping..."
+    if (step === "approving") return "Approving..."
+    if (step === "swapping") return "Swapping..."
     if (step === "done") return "Swap Complete ✓"
     return `Swap ${fromToken} → ${toToken}`
   }
@@ -121,22 +113,28 @@ export function SwapCard() {
         </div>
       </div>
 
+      {errorMsg && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+          {errorMsg}
+        </div>
+      )}
+
       <button
         onClick={handleSwap}
-        disabled={isLoading || !amount || step === "done"}
+        disabled={isLoading || !amount || step === "done" || !authenticated}
         className="w-full rounded-xl bg-gradient-to-r from-[#FF2D7A] to-[#2D6EFF] py-3 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {getButtonLabel()}
       </button>
 
-      {step === "approving" && !isApproving && (
+      {step === "approving" && (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Step 1 of 2 — Approve {fromToken} spend in MetaMask
+          Step 1 of 2 — Approve {fromToken} spend with your PIN
         </p>
       )}
-      {step === "swapping" && !isSwapping && (
+      {step === "swapping" && (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Step 2 of 2 — Confirm swap in MetaMask
+          Step 2 of 2 — Confirm swap with your PIN
         </p>
       )}
     </div>

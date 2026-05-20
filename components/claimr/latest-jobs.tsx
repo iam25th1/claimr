@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Clock } from "lucide-react";
-import { CLAIMR_ESCROW_ADDRESS as CLAIMR_ADDRESS, CLAIMR_ABI } from "@/lib/contracts";
+import { CLAIMR_ESCROW_ADDRESS as CLAIMR_ADDRESS } from "@/lib/contracts";
 import { useJobs } from "@/lib/useJobs";
 import { filterAndSortOpenJobs } from "@/lib/jobFilters";
+import { useAuth } from "@/lib/auth";
+import { useCircleWrite } from "@/lib/useCircleWrite";
 import { useState, useEffect } from "react";
 
 const COLORS = ["#FF2D7A", "#2D6EFF", "#10B981", "#8B5CF6", "#F59E0B", "#06B6D4"];
@@ -16,13 +17,12 @@ interface LatestJobsProps {
 }
 
 export function LatestJobs({ searchQuery = "", activeFilter = "All" }: LatestJobsProps = {}) {
-  const { isConnected } = useAccount();
+  const { authenticated } = useAuth();
   const router = useRouter();
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const { jobs, isLoading } = useJobs();
 
-  const { writeContract, data: hash, isPending, status } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { execute, isPending, isConfirming, isSuccess, isError } = useCircleWrite();
 
   // Filter open jobs by search + category, sort newest first, skip the top 2 (those are Featured).
   const filteredJobs = filterAndSortOpenJobs(jobs, {
@@ -39,20 +39,21 @@ export function LatestJobs({ searchQuery = "", activeFilter = "All" }: LatestJob
   }, [isSuccess, router]);
 
   useEffect(() => {
-    if (status === "error") setClaimingId(null);
-  }, [status]);
+    if (isError) setClaimingId(null);
+  }, [isError]);
 
   const handleClaim = (jobId: number) => {
-    if (!isConnected) {
+    if (!authenticated) {
       router.push("/onboarding?role=creator");
       return;
     }
     setClaimingId(jobId);
-    writeContract({
-      address: CLAIMR_ADDRESS,
-      abi: CLAIMR_ABI,
-      functionName: "claimJob",
-      args: [BigInt(jobId)],
+    execute({
+      contractAddress: CLAIMR_ADDRESS,
+      abiFunctionSignature: "claimJob(uint256)",
+      abiParameters: [jobId.toString()],
+    }).catch(() => {
+      // Hook surfaces error; nothing more to do here.
     });
   };
 

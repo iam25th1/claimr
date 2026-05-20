@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { ArrowRight, DollarSign, Calendar, Target, Lock, Loader2, CheckCircle2 } from "lucide-react";
-import { CLAIMR_ESCROW_ADDRESS, CLAIMR_ABI, USDC_ADDRESS, USDC_ABI } from "@/lib/contracts";
+import { CLAIMR_ESCROW_ADDRESS, USDC_ADDRESS } from "@/lib/contracts";
+import { useAuth } from "@/lib/auth";
+import { useCircleWrite } from "@/lib/useCircleWrite";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function PostJobPage() {
   const router = useRouter();
-  const { isConnected } = useAccount();
-  
+  const { authenticated } = useAuth();
+
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -23,77 +24,58 @@ export default function PostJobPage() {
   const [duration, setDuration] = useState("7");
   const [isPrivate, setIsPrivate] = useState(false);
   const [invitedCreator, setInvitedCreator] = useState("");
-  
-  // Transaction flow state
-  const [step, setStep] = useState<"idle" | "approving" | "posting" | "success">("idle");
-  
-  // Step 1 — Approve USDC
-  const { writeContract: approveUSDC, data: approveHash, error: approveError } = useWriteContract();
-  const { isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
-  
-  // Step 2 — Post Job
-  const { writeContract: postJobContract, data: postHash, error: postError } = useWriteContract();
-  const { isSuccess: postSuccess } = useWaitForTransactionReceipt({ hash: postHash });
-  
-  // When USDC approval confirms, automatically call postJob
-  useEffect(() => {
-    if (approveSuccess && step === "approving") {
-      setStep("posting");
-      const amountWei = parseUnits(pay, 6); // USDC has 6 decimals
-      
-      postJobContract({
-        address: CLAIMR_ESCROW_ADDRESS,
-        abi: CLAIMR_ABI,
-        functionName: 'postJob',
-        args: [
-          title,
-          criteria,
-          amountWei,
-          BigInt(duration),
-          isPrivate,
-          (invitedCreator || ZERO_ADDRESS) as `0x${string}`
-        ]
-      });
-    }
-  }, [approveSuccess, step]);
-  
-  // When postJob confirms, show success and navigate
-  useEffect(() => {
-    if (postSuccess && step === "posting") {
-      setStep("success");
-      setTimeout(() => router.push("/project"), 3000);
-    }
-  }, [postSuccess, step, router]);
-  
-  // Reset on error
-  useEffect(() => {
-    if (approveError || postError) {
-      setStep("idle");
-    }
-  }, [approveError, postError]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Local two-step state machine: approving USDC, then posting the job.
+  const [step, setStep] = useState<"idle" | "approving" | "posting" | "success">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const { execute } = useCircleWrite();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isConnected) {
-      alert("Please connect your wallet first");
+
+    if (!authenticated) {
+      alert("Please sign in first");
       return;
     }
-    
     if (!pay || parseFloat(pay) <= 0) {
       alert("Please enter a valid USDC amount");
       return;
     }
-    
-    setStep("approving");
-    const amountWei = parseUnits(pay, 6);
-    
-    approveUSDC({
-      address: USDC_ADDRESS,
-      abi: USDC_ABI,
-      functionName: 'approve',
-      args: [CLAIMR_ESCROW_ADDRESS, amountWei]
-    });
+
+    setErrorMsg(null);
+    const amountWei = parseUnits(pay, 6); // USDC has 6 decimals
+
+    try {
+      // Step 1: USDC allowance for the escrow contract. User enters PIN once.
+      setStep("approving");
+      await execute({
+        contractAddress: USDC_ADDRESS,
+        abiFunctionSignature: "approve(address,uint256)",
+        abiParameters: [CLAIMR_ESCROW_ADDRESS, amountWei.toString()],
+      });
+
+      // Step 2: Lock funds in escrow + create the job. User enters PIN again.
+      setStep("posting");
+      await execute({
+        contractAddress: CLAIMR_ESCROW_ADDRESS,
+        abiFunctionSignature: "postJob(string,string,uint256,uint256,bool,address)",
+        abiParameters: [
+          title,
+          criteria,
+          amountWei.toString(),
+          duration,
+          isPrivate,
+          (invitedCreator || ZERO_ADDRESS),
+        ],
+      });
+
+      setStep("success");
+      setTimeout(() => router.push("/project"), 3000);
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? "Transaction failed");
+      setStep("idle");
+    }
   };
 
   const getButtonContent = () => {
@@ -106,7 +88,7 @@ export default function PostJobPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <ProjectSidebar />
-      
+
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-3xl mx-auto">
           <div className="mb-8">
@@ -116,15 +98,15 @@ export default function PostJobPage() {
             </p>
           </div>
 
-          {!isConnected && (
+          {!authenticated && (
             <div className="mb-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-400">
-              ⚠️ Connect your wallet first to post a job
+              ⚠️ Sign in first to post a job
             </div>
           )}
 
-          {(approveError || postError) && (
+          {errorMsg && (
             <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
-              Transaction failed: {approveError?.message || postError?.message}
+              Transaction failed: {errorMsg}
             </div>
           )}
 
@@ -135,7 +117,7 @@ export default function PostJobPage() {
                 <Target className="h-5 w-5 text-[#2D6EFF]" />
                 Job Details
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-foreground">Job Title</label>
@@ -148,7 +130,7 @@ export default function PostJobPage() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="mb-2 block text-sm font-medium text-foreground">Description</label>
                   <textarea
@@ -282,11 +264,14 @@ export default function PostJobPage() {
                 <span className="font-semibold text-green-400">{pay || "0"} USDC</span> will be locked in escrow on Arc.
                 Funds release to creator automatically when AI verifies criteria are met.
               </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                You will be prompted for your PIN twice: once to approve USDC, once to post the job.
+              </p>
             </div>
 
             <button
               type="submit"
-              disabled={!isConnected || step !== "idle"}
+              disabled={!authenticated || step !== "idle"}
               className="group w-full rounded-xl bg-[#2D6EFF] px-6 py-4 text-base font-medium text-white transition-all hover:bg-[#2D6EFF]/90 shadow-lg shadow-[#2D6EFF]/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {getButtonContent()}
