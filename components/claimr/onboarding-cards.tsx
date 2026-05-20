@@ -1,155 +1,117 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowRight, Wallet, Twitter } from "lucide-react";
-import { usePrivy } from "@/lib/auth";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Mail, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+
 export function OnboardingCards() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const role = searchParams.get("role") || "creator";
-  const { login, connectWallet, authenticated, user } = usePrivy();
+  const searchParams = useSearchParams();
+  const role = searchParams.get("role") === "project" ? "project" : "creator";
 
-  const handleEmailLogin = async () => {
-    await login();
-    if (role === "creator") router.push("/dashboard");
-    else router.push("/project");
-  };
+  const { ready, authenticated, signUp } = useAuth();
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleWalletConnect = async () => {
-    await connectWallet();
-    if (role === "creator") router.push("/dashboard");
-    else router.push("/project");
-  };
-
+  // If the user is already signed in, bounce straight to the right dashboard.
   useEffect(() => {
-  if (authenticated) {
-    if (role === "creator") router.push("/dashboard");
-    else router.push("/project");
-  }
-}, [authenticated, role]);
+    if (ready && authenticated) {
+      router.replace(role === "project" ? "/project" : "/dashboard/discover");
+    }
+  }, [ready, authenticated, role, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signUp(trimmed);
+      router.replace(role === "project" ? "/project" : "/dashboard/discover");
+    } catch (err: any) {
+      setError(err?.message ?? "Could not complete signup");
+      setSubmitting(false);
+    }
+  };
+
+  const heading =
+    role === "project" ? "Post jobs, pay on verification" : "Claim work, get paid instantly";
+  const subheading =
+    role === "project"
+      ? "Lock USDC in escrow. We release it to creators only when AI verifies their work matches your brief."
+      : "Browse open jobs, complete the work, submit your proof. AI verifies, USDC lands in your wallet.";
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[#FF2D7A]/20 rounded-full blur-[128px] animate-float" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[#2D6EFF]/20 rounded-full blur-[128px] animate-float" style={{ animationDelay: "-3s" }} />
+    <div className="mx-auto max-w-md px-6 pt-32 pb-24">
+      <div className="text-center mb-10">
+        <p className="text-sm font-medium text-[#FF2D7A]">
+          {role === "project" ? "Project signup" : "Creator signup"}
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-white">{heading}</h1>
+        <p className="mt-3 text-[#a1a1aa]">{subheading}</p>
       </div>
 
-      <div
-        className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: "64px 64px",
-        }}
-      />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="relative">
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#a1a1aa]" />
+          <input
+            type="email"
+            required
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            disabled={submitting}
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 text-white placeholder:text-[#71717a] focus:border-[#FF2D7A]/50 focus:outline-none focus:ring-1 focus:ring-[#FF2D7A]/50 disabled:opacity-60"
+          />
+        </div>
 
-      <div className="relative z-10 w-full max-w-md mx-auto">
-        {/* Creator Card */}
-        {role === "creator" && (
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-[#FF2D7A]/20 rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
-            <div className="relative glass-card rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Start Earning on Claimr</h2>
-              <p className="text-sm text-[#a1a1aa] mb-8">Sign in to claim jobs and get paid in USDC</p>
-
-              <div className="space-y-3">
-                <button
-                  onClick={handleEmailLogin}
-                  className="group/btn w-full px-6 py-3.5 text-base font-medium text-white bg-[#FF2D7A] rounded-xl hover:bg-[#FF2D7A]/90 transition-all shadow-lg shadow-[#FF2D7A]/25 flex items-center justify-center gap-2"
-                >
-                  Continue with Email
-                  <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  onClick={handleEmailLogin}
-                  className="w-full px-6 py-3.5 text-base font-medium text-white bg-transparent border border-white/20 rounded-xl hover:bg-white/5 transition-all flex items-center justify-center gap-2"
-                >
-                  <Twitter className="w-4 h-4" />
-                  Continue with X
-                </button>
-
-                <div className="flex items-center gap-4 my-2">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-sm text-[#a1a1aa]">or</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
-
-                <button
-                  onClick={handleWalletConnect}
-                  className="w-full px-6 py-3.5 text-base font-medium text-white bg-transparent border border-white/20 rounded-xl hover:bg-white/5 transition-all flex items-center justify-center gap-2"
-                >
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
-                </button>
-              </div>
-
-              <p className="mt-6 text-xs text-[#a1a1aa] leading-relaxed">
-                Your embedded wallet is created automatically. Access your private key anytime.
-              </p>
-
-              <Link href="/onboarding?role=project" className="mt-4 inline-flex items-center gap-1 text-sm text-[#2D6EFF] hover:text-[#2D6EFF]/80 transition-colors">
-                {"I'm a Project instead"}
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
+        {error && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
           </div>
         )}
 
-        {/* Project Card */}
-        {role === "project" && (
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-[#2D6EFF]/20 rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
-            <div className="relative glass-card rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Post Your First Job</h2>
-              <p className="text-sm text-[#a1a1aa] mb-8">Sign in to post jobs and escrow USDC trustlessly</p>
+        <button
+          type="submit"
+          disabled={submitting || !email.trim()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF2D7A] py-3 font-medium text-white transition-all hover:bg-[#FF2D7A]/90 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Setting up your wallet...
+            </>
+          ) : (
+            <>
+              Continue with email
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      </form>
 
-              <div className="space-y-3">
-                <button
-                  onClick={handleEmailLogin}
-                  className="group/btn w-full px-6 py-3.5 text-base font-medium text-white bg-[#2D6EFF] rounded-xl hover:bg-[#2D6EFF]/90 transition-all shadow-lg shadow-[#2D6EFF]/25 flex items-center justify-center gap-2"
-                >
-                  Continue with Email
-                  <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  onClick={handleEmailLogin}
-                  className="w-full px-6 py-3.5 text-base font-medium text-white bg-transparent border border-white/20 rounded-xl hover:bg-white/5 transition-all flex items-center justify-center gap-2"
-                >
-                  <Twitter className="w-4 h-4" />
-                  Continue with X
-                </button>
-
-                <div className="flex items-center gap-4 my-2">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-sm text-[#a1a1aa]">or</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
-
-                <button
-                  onClick={handleWalletConnect}
-                  className="w-full px-6 py-3.5 text-base font-medium text-white bg-transparent border border-white/20 rounded-xl hover:bg-white/5 transition-all flex items-center justify-center gap-2"
-                >
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
-                </button>
-              </div>
-
-              <p className="mt-6 text-xs text-[#a1a1aa] leading-relaxed">
-                Deposit USDC to escrow when you post your first job. Powered by Arc + Circle.
-              </p>
-
-              <Link href="/onboarding?role=creator" className="mt-4 inline-flex items-center gap-1 text-sm text-[#FF2D7A] hover:text-[#FF2D7A]/80 transition-colors">
-                {"I'm a Creator instead"}
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        )}
+      <div className="mt-8 flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-4 text-xs text-[#a1a1aa]">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-[#2D6EFF] mt-0.5" />
+        <p>
+          A Circle wallet is created for you on Arc Testnet. On the next step you set a 6-digit PIN
+          and pick recovery questions. You own the keys; Claimr never sees your PIN.
+        </p>
       </div>
-    </section>
+
+      <p className="mt-6 text-center text-xs text-[#71717a]">
+        Want to sign up as a {role === "project" ? "creator" : "project"} instead?{" "}
+        <a
+          href={`/onboarding?role=${role === "project" ? "creator" : "project"}`}
+          className="text-[#FF2D7A] hover:underline"
+        >
+          Switch
+        </a>
+      </p>
+    </div>
   );
 }

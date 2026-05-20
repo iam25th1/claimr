@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.0",
+    "@circle-fin/user-controlled-wallets": "^10.3.1",
     "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@hookform/resolvers": "^3.9.1",
     "@privy-io/react-auth": "^3.26.0",

@@ -1,19 +1,18 @@
 "use client";
 
-import { usePrivy } from "@/lib/auth";
-import { useAccount } from "wagmi";
+import { useAuth } from "@/lib/auth";
 import { StatsCards } from "@/components/claimr/stats-cards";
 import { FeaturedJobs } from "@/components/claimr/featured-jobs";
 import { LatestJobs } from "@/components/claimr/latest-jobs";
 
 export default function DashboardPage() {
-  const { user } = usePrivy();
-  const { address } = useAccount();
+  const { user } = useAuth();
 
-  const displayName = user?.twitter?.username && `@${user.twitter.username}`
-    || user?.email?.address && user.email.address.split("@")[0]
-    || address && `${address.slice(0, 6)}...${address.slice(-4)}`
-    || "Creator";
+  const displayName =
+    (user?.email && user.email.split("@")[0]) ||
+    (user?.walletAddress
+      ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
+      : "Creator");
 
   return (
     <div className="space-y-8">

@@ -1,41 +1,103 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PrivyProvider } from "@privy-io/react-auth";
 import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmi";
+import { AuthContext, type AuthContextValue, type AuthUser } from "@/lib/auth";
+import { executeChallenge } from "@/lib/circle-client";
 
 const queryClient = new QueryClient();
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  const inner = (
-    <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={config}>
-        {children}
-      </WagmiProvider>
-    </QueryClientProvider>
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  // On mount, check existing session via the httpOnly cookie.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/circle/me", { cache: "no-store" });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.email) {
+            setUser({
+              email: data.email,
+              walletAddress: data.walletAddress ?? null,
+            });
+          }
+        }
+      } catch {
+        // Network error or no session: stay unauthenticated.
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const signUp = useCallback(async (email: string) => {
+    // 1. Backend creates the Circle user, issues a session token, opens a wallet-init challenge.
+    const onboard = await fetch("/api/circle/onboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!onboard.ok) {
+      const err = await onboard.json().catch(() => ({}));
+      throw new Error(err?.error ?? "Could not start signup");
+    }
+    const { userToken, encryptionKey, challengeId } = await onboard.json();
+
+    // 2. Client SDK takes the user through PIN + security-question setup.
+    await executeChallenge(challengeId, { userToken, encryptionKey });
+
+    // 3. Backend records the session cookie and fetches the freshly created wallet.
+    const finalize = await fetch("/api/circle/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!finalize.ok) {
+      const err = await finalize.json().catch(() => ({}));
+      throw new Error(err?.error ?? "Could not finalize signup");
+    }
+    const data = await finalize.json();
+    setUser({
+      email: data.email,
+      walletAddress: data.walletAddress ?? null,
+    });
+  }, []);
+
+  const logout = useCallback(async () => {
+    await fetch("/api/circle/logout", { method: "POST" }).catch(() => {});
+    setUser(null);
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      ready,
+      authenticated: !!user,
+      user,
+      signUp,
+      logout,
+    }),
+    [ready, user, signUp, logout]
   );
 
-  if (!PRIVY_APP_ID) {
-    if (typeof window !== "undefined") {
-      console.warn(
-        "[Claimr] NEXT_PUBLIC_PRIVY_APP_ID not set. Auth flows are disabled. " +
-          "Add it in Vercel env vars to enable Privy."
-      );
-    }
-    return inner;
-  }
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      config={{
-        loginMethods: ["email", "wallet", "twitter"],
-        appearance: { theme: "dark", accentColor: "#FF2D7A" },
-      }}
-    >
-      {inner}
-    </PrivyProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={config}>{children}</WagmiProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }

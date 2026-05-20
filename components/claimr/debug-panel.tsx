@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
-import { usePrivy } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { useJobs } from "@/lib/useJobs";
 import { Bug, X, Download, Copy, Trash2 } from "lucide-react";
 
@@ -31,10 +31,10 @@ try {
 } catch (e) {}
 
 try {
-  const priv = usePrivy();
-  user = priv.user;
-  authenticated = priv.authenticated;
-  ready = priv.ready;
+  const auth = useAuth();
+  user = auth.user;
+  authenticated = auth.authenticated;
+  ready = auth.ready;
 } catch (e) {}
 
 try {
@@ -103,13 +103,10 @@ try {
   const fullState = {
     timestamp: new Date().toISOString(),
     auth: {
-      privyReady: ready,
-      privyAuthenticated: authenticated,
-      userId: user?.id,
-      userEmail: user?.email?.address,
-      userTwitter: user?.twitter?.username,
-      hasWallet: !!user?.wallet,
-      walletAddress: user?.wallet?.address,
+      ready,
+      authenticated,
+      email: user?.email,
+      walletAddress: user?.walletAddress,
     },
     wagmi: {
       isConnected,

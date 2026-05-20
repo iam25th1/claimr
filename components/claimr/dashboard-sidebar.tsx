@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Compass, Briefcase, DollarSign, Wallet, Settings, LogOut } from "lucide-react";
-import { useAccount } from "wagmi";
-import { usePrivy } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { useState, useEffect } from "react";
 import { Logo } from "@/components/claimr/logo";
 
@@ -19,14 +18,14 @@ const menuItems = [
 function UserProfile() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const { address } = useAccount();
-  const { user, logout, authenticated } = usePrivy();
+  const { user, logout, authenticated } = useAuth();
   const router = useRouter();
 
-  const displayName = user?.email?.address
-    || user?.twitter?.username && `@${user.twitter.username}`
-    || address && `${address.slice(0, 6)}...${address.slice(-4)}`
-    || "Creator";
+  const displayName =
+    user?.email ||
+    (user?.walletAddress
+      ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
+      : "Creator");
 
   const avatarLetter = displayName.slice(0, 1).toUpperCase();
 

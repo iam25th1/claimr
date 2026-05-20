@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PlusCircle, Briefcase, Vault, BarChart3, Settings, BadgeCheck, LogOut } from "lucide-react";
-import { useAccount } from "wagmi";
-import { usePrivy } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/claimr/logo";
 
 const menuItems = [
@@ -19,17 +18,17 @@ const menuItems = [
 
 export function ProjectSidebar() {
   const pathname = usePathname();
-  const { user, logout, authenticated } = usePrivy();
-  const { address } = useAccount();
+  const { user, logout, authenticated } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  const displayName = user?.email?.address
-    || user?.twitter?.username && `@${user.twitter.username}`
-    || address && `${address.slice(0, 6)}...${address.slice(-4)}`
-    || "Project";
+  const displayName =
+    user?.email ||
+    (user?.walletAddress
+      ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
+      : "Project");
 
   const avatarLetter = displayName.slice(0, 1).toUpperCase();
 
