@@ -1,6 +1,4 @@
-import { SearchFilters } from "@/components/claimr/search-filters"
-import { FeaturedJobs } from "@/components/claimr/featured-jobs"
-import { LatestJobs } from "@/components/claimr/latest-jobs"
+import { DiscoverFeed } from "@/components/claimr/discover-feed";
 
 export default function DiscoverPage() {
   return (
@@ -11,10 +9,7 @@ export default function DiscoverPage() {
           Find the perfect opportunity and start earning USDC
         </p>
       </div>
-
-      <SearchFilters />
-      <FeaturedJobs />
-      <LatestJobs />
+      <DiscoverFeed />
     </div>
-  )
+  );
 }

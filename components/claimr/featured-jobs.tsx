@@ -5,9 +5,15 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagm
 import { Clock, Diamond } from "lucide-react";
 import { CLAIMR_ESCROW_ADDRESS as CLAIMR_ADDRESS, CLAIMR_ABI } from "@/lib/contracts";
 import { useJobs } from "@/lib/useJobs";
+import { filterAndSortOpenJobs, hasActiveFilters } from "@/lib/jobFilters";
 import { useState, useEffect } from "react";
 
-export function FeaturedJobs() {
+interface FeaturedJobsProps {
+  searchQuery?: string;
+  activeFilter?: string;
+}
+
+export function FeaturedJobs({ searchQuery = "", activeFilter = "All" }: FeaturedJobsProps = {}) {
   const { isConnected } = useAccount();
   const router = useRouter();
   const [claimingId, setClaimingId] = useState<number | null>(null);
@@ -16,8 +22,13 @@ export function FeaturedJobs() {
   const { writeContract, data: hash, isPending, error, status } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  // Only show open jobs (status 0) for featured — take first 2
-  const featuredJobs = jobs.filter((j) => j.status === 0).slice(0, 2);
+  // Filter open jobs by search + category, sort newest first, take top 2.
+  const filteredJobs = filterAndSortOpenJobs(jobs, {
+    search: searchQuery,
+    category: activeFilter,
+  });
+  const featuredJobs = filteredJobs.slice(0, 2);
+  const isFiltering = hasActiveFilters({ search: searchQuery, category: activeFilter });
 
   useEffect(() => {
     if (isSuccess) {
@@ -63,7 +74,11 @@ export function FeaturedJobs() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Featured</h2>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <p className="text-muted-foreground">No open jobs yet. Check back soon.</p>
+          <p className="text-muted-foreground">
+            {isFiltering
+              ? "No jobs match your search."
+              : "No open jobs yet. Check back soon."}
+          </p>
         </div>
       </div>
     );
