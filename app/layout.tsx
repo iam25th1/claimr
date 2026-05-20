@@ -38,7 +38,7 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-background text-foreground">
         <Providers>
           {children}
-          <DebugPanel />
+          {process.env.NODE_ENV !== 'production' && <DebugPanel />}
           {process.env.NODE_ENV === 'production' && <Analytics />}
         </Providers>
       </body>

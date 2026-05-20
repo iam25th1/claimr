@@ -58,15 +58,15 @@ export function Hero() {
         <div className="mt-16 flex items-center justify-center gap-8 text-sm text-[#a1a1aa]">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-            <span>$2.4M+ Paid Out</span>
+            <span>AI-verified payouts</span>
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-            <span>1,200+ Creators</span>
+            <span>Built on Arc</span>
           </div>
           <div className="hidden md:flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-            <span>98% Success Rate</span>
+            <span>Instant USDC settlement</span>
           </div>
         </div>
       </div>
