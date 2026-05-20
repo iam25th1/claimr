@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PlusCircle, Briefcase, Vault, BarChart3, Settings, BadgeCheck, LogOut } from "lucide-react";
 import { useAccount } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
+import { Logo } from "@/components/claimr/logo";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/project" },
@@ -41,7 +42,7 @@ export function ProjectSidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col border-r border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="p-6">
         <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#FF2D7A] to-[#2D6EFF]" />
+          <Logo size={32} />
           <span className="text-xl font-bold text-foreground">Claimr</span>
         </Link>
       </div>
