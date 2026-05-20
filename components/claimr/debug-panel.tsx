@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useAccount } from "wagmi";
+import { useChainId } from "wagmi";
 import { useAuth } from "@/lib/auth";
 import { useJobs } from "@/lib/useJobs";
 import { Bug, X, Download, Copy, Trash2 } from "lucide-react";
@@ -19,15 +19,12 @@ export function DebugPanel() {
   const [tab, setTab] = useState<"state" | "logs">("state");
   const logsRef = useRef<LogEntry[]>([]);
 
-  let address: any, isConnected: any, chain: any;
+  let chainId: number | undefined;
 let user: any, authenticated: any, ready: any;
 let jobs: any[] = [], isLoading = false, totalJobs = 0;
 
 try {
-  const acc = useAccount();
-  address = acc.address;
-  isConnected = acc.isConnected;
-  chain = acc.chain;
+  chainId = useChainId();
 } catch (e) {}
 
 try {
@@ -108,18 +105,19 @@ try {
       email: user?.email,
       walletAddress: user?.walletAddress,
     },
-    wagmi: {
-      isConnected,
-      address,
-      chainId: chain?.id,
-      chainName: chain?.name,
+    chain: {
+      chainId,
     },
     jobs: {
       isLoading,
       totalJobs,
       jobsFound: jobs.length,
-      myPostedJobs: jobs.filter((j) => j.project.toLowerCase() === address?.toLowerCase()).length,
-      myClaimedJobs: jobs.filter((j) => j.creator.toLowerCase() === address?.toLowerCase()).length,
+      myPostedJobs: jobs.filter(
+        (j) => j.project.toLowerCase() === user?.walletAddress?.toLowerCase()
+      ).length,
+      myClaimedJobs: jobs.filter(
+        (j) => j.creator.toLowerCase() === user?.walletAddress?.toLowerCase()
+      ).length,
       jobsByStatus: {
         open: jobs.filter((j) => j.status === 0).length,
         claimed: jobs.filter((j) => j.status === 1).length,

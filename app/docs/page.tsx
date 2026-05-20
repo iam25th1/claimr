@@ -82,8 +82,9 @@ export default function DocsPage() {
             <h2 className="text-2xl font-semibold text-white">For Creators</h2>
             <ol className="list-inside list-decimal space-y-3 leading-relaxed text-[#a1a1aa]">
               <li>
-                Connect a wallet, or sign in with email or Twitter to spin up
-                an embedded wallet.
+                Sign up with your email. We create a Circle wallet on Arc
+                Testnet for you and secure it with a PIN and recovery
+                questions. You own the keys; Claimr never sees your PIN.
               </li>
               <li>
                 Browse open jobs on the{" "}
@@ -114,7 +115,10 @@ export default function DocsPage() {
           <section id="for-projects" className="scroll-mt-32 space-y-4">
             <h2 className="text-2xl font-semibold text-white">For Projects</h2>
             <ol className="list-inside list-decimal space-y-3 leading-relaxed text-[#a1a1aa]">
-              <li>Connect your project wallet.</li>
+              <li>
+                Sign up with your project email and set up your Circle
+                wallet on Arc Testnet.
+              </li>
               <li>
                 Click <span className="font-mono text-white">Post a Job</span>{" "}
                 and define title, payout amount in USDC, deadline, and the
@@ -199,9 +203,12 @@ export default function DocsPage() {
               Status &amp; Roadmap
             </h2>
             <p className="leading-relaxed text-[#a1a1aa]">
-              Active development. Current focus: Privy to Circle Wallets
-              migration, deeper job discovery (better filters, sort options),
-              and creator profile pages.
+              Active development on Arc Testnet. Auth and wallets run on
+              Circle&apos;s User-Controlled Wallets. Current focus: deeper
+              job discovery (better filters, sort options), creator profile
+              pages, transaction acceleration UX, and SCA wallets with gas
+              sponsorship so new creators can claim without holding USDC
+              for gas.
             </p>
             <p className="leading-relaxed text-[#a1a1aa]">
               Source:{" "}
