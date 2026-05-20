@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@/lib/auth";
 import { useAccount } from "wagmi";
 import { StatsCards } from "@/components/claimr/stats-cards";
 import { FeaturedJobs } from "@/components/claimr/featured-jobs";

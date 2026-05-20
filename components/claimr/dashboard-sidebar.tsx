@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Compass, Briefcase, DollarSign, Wallet, Settings, LogOut } from "lucide-react";
 import { useAccount } from "wagmi";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@/lib/auth";
 import { useState, useEffect } from "react";
 import { Logo } from "@/components/claimr/logo";
 

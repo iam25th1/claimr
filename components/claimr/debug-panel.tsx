@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@/lib/auth";
 import { useJobs } from "@/lib/useJobs";
 import { Bug, X, Download, Copy, Trash2 } from "lucide-react";
 

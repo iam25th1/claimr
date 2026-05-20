@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Wallet, Twitter } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@/lib/auth";
 import { useState, useEffect } from "react";
 export function OnboardingCards() {
   const searchParams = useSearchParams();

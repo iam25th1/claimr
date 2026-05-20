@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, PlusCircle, Briefcase, Vault, BarChart3, Settings, BadgeCheck, LogOut } from "lucide-react";
 import { useAccount } from "wagmi";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@/lib/auth";
 import { Logo } from "@/components/claimr/logo";
 
 const menuItems = [
