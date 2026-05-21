@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { useAccount } from "wagmi"
 import { useJobs } from "@/lib/useJobs"
+import { useAuth } from "@/lib/auth"
 import { Clock, CheckCircle, ArrowRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -18,14 +18,17 @@ function getDaysLeft(deadline: number) {
 
 export function MyJobsList() {
   const [activeTab, setActiveTab] = useState("active")
-  const { address } = useAccount()
+  // r3a removed wagmi connectors, so useAccount() always returns undefined.
+  // The real Circle wallet address lives on the auth user.
+  const { user } = useAuth()
+  const address = user?.walletAddress
   const { jobs, isLoading } = useJobs()
   const router = useRouter()
 
   // Jobs where this wallet is the creator
-  const myJobs = jobs.filter(
-    (j) => j.creator.toLowerCase() === address?.toLowerCase()
-  )
+  const myJobs = address
+    ? jobs.filter((j) => j.creator.toLowerCase() === address.toLowerCase())
+    : []
 
   const filteredJobs = myJobs.filter((job) => {
     if (activeTab === "active")    return job.status === 1 // Claimed
