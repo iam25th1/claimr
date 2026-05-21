@@ -21,11 +21,11 @@ function isHex40(s: unknown): s is string {
 }
 
 function isValidSignature(s: unknown): s is string {
-  // e.g. "claimJob(uint256)" or "approve(address,uint256)"
   return typeof s === "string" && /^[a-zA-Z_][a-zA-Z0-9_]*\([^)]*\)$/.test(s);
 }
 
 export async function POST(req: NextRequest) {
+  let diagContext: any = {};
   try {
     const cookieStore = await cookies();
     const cookie = cookieStore.get(COOKIE_NAME);
@@ -36,62 +36,76 @@ export async function POST(req: NextRequest) {
     if (!session?.userId) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
+    diagContext.userId = session.userId;
 
     const body = await req.json().catch(() => ({}));
     const contractAddress = body?.contractAddress;
     const abiFunctionSignature = body?.abiFunctionSignature;
     const abiParameters = body?.abiParameters;
 
+    diagContext.contractAddress = contractAddress;
+    diagContext.abiFunctionSignature = abiFunctionSignature;
+    diagContext.abiParameters = abiParameters;
+
     if (!isHex40(contractAddress)) {
-      return NextResponse.json(
-        { error: "Invalid contractAddress" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid contractAddress" }, { status: 400 });
     }
     if (!isValidSignature(abiFunctionSignature)) {
-      return NextResponse.json(
-        { error: "Invalid abiFunctionSignature" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid abiFunctionSignature" }, { status: 400 });
     }
     if (!Array.isArray(abiParameters)) {
-      return NextResponse.json(
-        { error: "abiParameters must be an array" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "abiParameters must be an array" }, { status: 400 });
     }
 
     const client = getCircleClient();
 
-    // Issue a fresh user token. We use it both server-side to create the
-    // challenge and return it to the client so the SDK can execute the
-    // challenge using the same session.
     const tokenResp = await client.createUserToken({ userId: session.userId });
     const userToken = tokenResp.data?.userToken;
     const encryptionKey = tokenResp.data?.encryptionKey;
     if (!userToken || !encryptionKey) {
-      return NextResponse.json(
-        { error: "Could not issue session token" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Could not issue session token" }, { status: 500 });
     }
 
-    // Look up the user's Arc wallet to get walletId.
+    // List ALL wallets for this user, not just the first Arc wallet. This
+    // surfaces multi-wallet situations where getArcWallet might be picking
+    // a different one than the user funded.
+    const allWalletsResp = await client.listWallets({ userToken });
+    const allWallets = allWalletsResp.data?.wallets ?? [];
+    diagContext.allWallets = allWallets.map((w: any) => ({
+      id: w.id,
+      address: w.address,
+      blockchain: w.blockchain,
+      accountType: w.accountType,
+      state: w.state,
+    }));
+    console.log("[CIRCLE/tx/contract-execution] all user wallets:", JSON.stringify(diagContext.allWallets));
+
     const wallet = await getArcWallet(userToken);
     if (!wallet?.id) {
-      return NextResponse.json(
-        { error: "No Arc wallet found for user" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No Arc wallet found for user" }, { status: 400 });
+    }
+    diagContext.selectedWallet = {
+      id: wallet.id,
+      address: (wallet as any).address,
+      blockchain: (wallet as any).blockchain,
+      accountType: (wallet as any).accountType,
+      state: (wallet as any).state,
+    };
+    console.log("[CIRCLE/tx/contract-execution] selected wallet:", JSON.stringify(diagContext.selectedWallet));
+
+    // Also pull the wallet's token balance from Circle's POV. If this disagrees
+    // with Arcscan, we have a wallet-mismatch bug.
+    try {
+      const balResp = await client.getWalletTokenBalance({ userToken, walletId: wallet.id });
+      diagContext.circleBalances = (balResp.data?.tokenBalances ?? []).map((tb: any) => ({
+        token: tb.token?.symbol ?? tb.token?.tokenAddress,
+        amount: tb.amount,
+      }));
+      console.log("[CIRCLE/tx/contract-execution] balances per circle:", JSON.stringify(diagContext.circleBalances));
+    } catch (balErr: any) {
+      console.warn("[CIRCLE/tx/contract-execution] balance fetch failed:", balErr?.message);
     }
 
-    // Create the contract-execution challenge. Arc pays gas in USDC; "MEDIUM"
-    // is the default fee level and works well for testnet.
-    //
-    // The user-controlled SDK method is named
-    // `createUserTransactionContractExecutionChallenge`. Don't use
-    // `createContractExecutionTransaction`; that name only exists on the
-    // developer-controlled SDK and will throw "is not a function" at runtime.
     const execResp = await client.createUserTransactionContractExecutionChallenge({
       userToken,
       walletId: wallet.id,
@@ -109,22 +123,25 @@ export async function POST(req: NextRequest) {
         "[CIRCLE/tx/contract-execution] no challengeId returned",
         execResp.data
       );
-      return NextResponse.json(
-        { error: "Could not create transaction challenge" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Could not create transaction challenge" }, { status: 500 });
     }
 
-    return NextResponse.json({
-      challengeId,
-      transactionId,
-      userToken,
-      encryptionKey,
-    });
+    return NextResponse.json({ challengeId, transactionId, userToken, encryptionKey });
   } catch (err: any) {
-    console.error("[CIRCLE/tx/contract-execution] FATAL", err);
-    // Surface Circle's error message when available, scrubbed of internals.
-    const upstream = err?.response?.data?.message;
+    // Capture every diagnostic field Circle exposes. The default Error.toString()
+    // drops most of this, which is why earlier failures looked opaque.
+    const diag = {
+      circleCode: err?.code,
+      circleMessage: err?.message,
+      httpStatus: err?.status,
+      httpUrl: err?.url,
+      httpMethod: err?.method,
+      upstream: err?.response?.data,
+      stack: err?.stack?.split("\n").slice(0, 3),
+      ctx: diagContext,
+    };
+    console.error("[CIRCLE/tx/contract-execution] FATAL", JSON.stringify(diag, null, 2));
+    const upstream = err?.response?.data?.message ?? err?.message;
     return NextResponse.json(
       { error: upstream ?? "Could not create transaction" },
       { status: 500 }
