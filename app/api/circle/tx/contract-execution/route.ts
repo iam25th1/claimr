@@ -87,7 +87,12 @@ export async function POST(req: NextRequest) {
 
     // Create the contract-execution challenge. Arc pays gas in USDC; "MEDIUM"
     // is the default fee level and works well for testnet.
-    const execResp = await client.createContractExecutionTransaction({
+    //
+    // The user-controlled SDK method is named
+    // `createUserTransactionContractExecutionChallenge`. Don't use
+    // `createContractExecutionTransaction`; that name only exists on the
+    // developer-controlled SDK and will throw "is not a function" at runtime.
+    const execResp = await client.createUserTransactionContractExecutionChallenge({
       userToken,
       walletId: wallet.id,
       contractAddress,
