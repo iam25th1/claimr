@@ -32,3 +32,12 @@ export function useIsAdmin(): {
   const addr = user.walletAddress.toLowerCase();
   return { ready: true, authenticated: true, isAdmin: allowed.includes(addr) };
 }
+
+// Compatibility shim for files written against the older admin batch
+// which used a plain helper instead of the hook. Both APIs work; new
+// code should prefer useIsAdmin().
+export function isAdminWallet(walletAddress: string | null | undefined): boolean {
+  if (!walletAddress) return false;
+  const allowed = parseAllowed();
+  return allowed.includes(walletAddress.toLowerCase());
+}
