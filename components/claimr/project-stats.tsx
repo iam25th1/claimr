@@ -1,11 +1,12 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { useJobs } from "@/lib/useJobs";
 import { Vault, Briefcase, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export function ProjectStats() {
-  const { address } = useAccount();
+  const { user } = useAuth();
+  const address = user?.walletAddress;
   const { jobs, isLoading } = useJobs();
 
   const myJobs = jobs.filter(

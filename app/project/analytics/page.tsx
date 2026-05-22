@@ -1,12 +1,13 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { useJobs } from "@/lib/useJobs";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { TrendingUp, Users, Target, DollarSign } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export default function AnalyticsPage() {
-  const { address } = useAccount();
+  const { user } = useAuth();
+  const address = user?.walletAddress;
   const { jobs, isLoading } = useJobs();
 
   const myJobs = jobs.filter(

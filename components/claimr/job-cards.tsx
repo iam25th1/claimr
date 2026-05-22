@@ -1,8 +1,8 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { useJobs } from "@/lib/useJobs";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 const STATUS_LABELS: Record<number, string> = {
   0: "Open",
@@ -27,7 +27,8 @@ function getInitials(address: string) {
 }
 
 export function ProjectJobCards() {
-  const { address } = useAccount();
+  const { user } = useAuth();
+  const address = user?.walletAddress;
   const { jobs, isLoading } = useJobs();
   const router = useRouter();
 

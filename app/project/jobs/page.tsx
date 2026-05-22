@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Clock, Users, Eye } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
+import { useAuth } from "@/lib/auth";
 
 const STATUS_LABELS: Record<number, string> = {
   0: "Open",
@@ -39,7 +39,8 @@ function getProgress(status: number) {
 
 export default function ActiveJobsPage() {
   const [filter, setFilter] = useState("All");
-  const { address } = useAccount();
+  const { user } = useAuth();
+  const address = user?.walletAddress;
   const { jobs, isLoading } = useJobs();
 
   const filters = ["All", "Open", "In Progress", "Pending Review", "Completed"];
