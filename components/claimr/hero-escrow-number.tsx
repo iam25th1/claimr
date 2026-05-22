@@ -3,6 +3,9 @@
 import { useJobs } from "@/lib/useJobs";
 import { useAuth } from "@/lib/auth";
 import { Lock } from "lucide-react";
+import { motion } from "motion/react";
+import { AnimatedNumber } from "@/components/primitives/animated-number";
+import { motionEase } from "@/lib/motion";
 
 // Big gradient-filled hero showing total USDC currently locked in escrow
 // across this project's active jobs (Open, Claimed, or Submitted).
@@ -27,7 +30,11 @@ export function HeroEscrowNumber() {
   const totalLocked = activeJobs.reduce((sum, j) => sum + j.amount, 0);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#FF2D7A]/[0.06] to-[#2D6EFF]/[0.06] p-8 backdrop-blur-sm">
+    <motion.div
+      className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#FF2D7A]/[0.06] to-[#2D6EFF]/[0.06] p-8 backdrop-blur-sm"
+      animate={{ scale: [1, 1.006, 1] }}
+      transition={{ duration: 3.6, repeat: Infinity, ease: motionEase.inOut }}
+    >
       <div className="flex items-center gap-2 mb-4">
         <Lock className="h-4 w-4 text-muted-foreground" />
         <p className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -39,7 +46,7 @@ export function HeroEscrowNumber() {
         <div className="h-20 w-64 rounded-lg bg-white/5 animate-pulse" />
       ) : (
         <p className="text-6xl md:text-7xl font-bold tracking-tight leading-none bg-gradient-to-br from-[#FF2D7A] to-[#2D6EFF] bg-clip-text text-transparent">
-          {totalLocked.toLocaleString()}
+          <AnimatedNumber value={totalLocked} />
           <span className="text-2xl md:text-3xl ml-3 text-muted-foreground font-medium">
             USDC
           </span>
@@ -63,6 +70,6 @@ export function HeroEscrowNumber() {
           </>
         )}
       </p>
-    </div>
+    </motion.div>
   );
 }

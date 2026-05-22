@@ -5,6 +5,9 @@ import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Briefcase, Clock, Eye, Users } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
 import { useAuth } from "@/lib/auth";
+import { motion, AnimatePresence } from "motion/react";
+import { StatePill } from "@/components/primitives/state-pill";
+import { motionDurations, motionEase } from "@/lib/motion";
 import { EmptyState } from "@/components/claimr/empty-state";
 import { JobCardSkeleton } from "@/components/claimr/skeleton";
 
@@ -93,23 +96,26 @@ export default function ActiveJobsPage() {
 
           {!isLoading && (
             <div className="space-y-3">
+              <AnimatePresence initial={false}>
               {filteredJobs.map((job) => {
-                const statusLabel = STATUS_LABELS[job.status] ?? "Unknown";
                 const daysLeft = getDaysLeft(job.deadline);
                 const progress = getProgress(job.status);
 
                 return (
-                  <div
+                  <motion.div
                     key={job.id}
-                    className="rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm transition-all hover:border-white/20"
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: motionDurations.base, ease: motionEase.out }}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm hover:border-white/20"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-foreground">{job.title}</h3>
-                          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColors[statusLabel] ?? ""}`}>
-                            {statusLabel}
-                          </span>
+                          <StatePill state={job.status} />
                         </div>
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -154,9 +160,10 @@ export default function ActiveJobsPage() {
                         View Submissions
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
+              </AnimatePresence>
 
               {filteredJobs.length === 0 && (
                 <EmptyState

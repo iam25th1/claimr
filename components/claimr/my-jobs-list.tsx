@@ -5,6 +5,9 @@ import { useJobs } from "@/lib/useJobs"
 import { useAuth } from "@/lib/auth"
 import { ArrowRight, Briefcase, CheckCircle, Clock, Inbox } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "motion/react"
+import { StatePill } from "@/components/primitives/state-pill"
+import { motionDurations, motionEase } from "@/lib/motion"
 import { EmptyState } from "@/components/claimr/empty-state"
 import { MyJobRowSkeleton } from "@/components/claimr/skeleton"
 
@@ -67,16 +70,22 @@ export function MyJobsList() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-4">
+      <motion.div layout className="flex flex-col gap-4">
+        <AnimatePresence initial={false}>
         {filteredJobs.map((job) => {
           const daysLeft = getDaysLeft(job.deadline)
           const isCompleted = job.status === 3
           const earned = (job.amount * 0.95).toFixed(2)
 
           return (
-            <div
+            <motion.div
               key={job.id}
-              className={`glass-card rounded-xl p-5 transition-all ${
+              layout
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: motionDurations.base, ease: motionEase.out }}
+              className={`glass-card rounded-xl p-5 ${
                 isCompleted ? "opacity-70" : ""
               }`}
             >
@@ -96,7 +105,10 @@ export function MyJobsList() {
                     <p className="text-sm text-muted-foreground font-mono">
                       {job.project.slice(0, 6)}...{job.project.slice(-4)}
                     </p>
-                    <h3 className="font-semibold text-foreground">{job.title}</h3>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="font-semibold text-foreground">{job.title}</h3>
+                      <StatePill state={job.status} size="sm" />
+                    </div>
                     <div className="mt-2 flex items-center gap-4">
                       <span className="text-sm font-medium text-green-400">
                         {job.amount} USDC
@@ -144,9 +156,10 @@ export function MyJobsList() {
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
           )
         })}
+        </AnimatePresence>
 
         {filteredJobs.length === 0 && (
           <EmptyState
@@ -179,7 +192,7 @@ export function MyJobsList() {
             }
           />
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }
