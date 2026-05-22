@@ -1,57 +1,91 @@
-Slice 1 of 3 — Onboarding rebuild
+Slice 2 of 3 - Project owner experience
 
-Just two files. No apply script needed, drop-in replacement.
+Six files. All are drop-in replacements or new additions. No apply script.
 
-  components/claimr/onboarding-cards.tsx   rebuilt (same export, same import path)
-  lib/profile-store.ts                     included for safety in case the
-                                           flow-fix batch wasn't applied yet
-                                           (identical to the one in flow-fix)
+  NEW
+    components/claimr/page-header.tsx        shared PageHeader + SectionHeader
+    components/claimr/post-job-stepper.tsx   visual stepper for posting a job
+    components/claimr/project-jobs-table.tsx full table with filter + search
+
+  REBUILT (zip overwrites the existing files)
+    app/project/page.tsx       overview, new composition
+    app/project/post/page.tsx  thin wrapper using PostJobStepper
+    app/project/jobs/page.tsx  thin wrapper using ProjectJobsTable
 
 
-What's different
+What changed and why
 
-Old onboarding: one screen, email input, immediate router.replace to
-dashboard. No funding step, no profile step, no progress indicator.
+/project (overview)
+  - Top: PageHeader with eyebrow + title + "Post a job" action button on
+    the right. Action is now where the user expects it, not stuck at the
+    bottom as PostJobCTA was.
+  - Sections each have their own SectionHeader with optional "See all" link
+  - Order: hero (escrow breathing number) -> wallet -> stats -> verifier
+    insight -> recent activity -> active jobs preview
+  - Removes the bottom PostJobCTA component (action moved to the header)
 
-New onboarding: real 4-or-5 step flow with progress dots at top:
+/project/post (formerly a button-label flow)
+  - 4-step visible stepper: Details -> Criteria + pay -> Visibility -> Review + lock
+  - StepBar at the top shows progress with done/active/upcoming states
+  - Review step shows a complete summary before the lock action
+  - During the on-chain action, an explicit "Approving USDC -> Locking in escrow"
+    progress panel renders below the summary. No more guessing what the
+    button label means
+  - Errors use the friendly ErrorCallout (insufficient funds gets "Fund wallet"
+    button, indexing latency gets refresh, etc) instead of raw chain errors
 
-  1. Role pick (only shown when ?role= isn't in URL)
-     Two cards side by side. Tap one, advances.
+/project/jobs (formerly an inline list)
+  - Proper table on desktop: ID, Job, Claimant, USDC, Status, ChevronRight
+  - Card layout on mobile (auto-collapse via responsive grid)
+  - Search box at the top: matches title, criteria, job id
+  - Filter pills: All / Open / Claimed / Under review / Paid
+  - Rows have layout animation when filter changes
+  - Each row links to /project/jobs/[id] (the detail page shipped in admin batch)
+  - Loading shows JobCardSkeleton x3
+  - Empty state copy adapts: "No jobs posted yet" with Post-a-Job CTA when
+    truly empty, vs "No [filter] jobs" with no CTA when just filtered out
 
-  2. Email entry
-     With a Circle-wallet explainer callout, "no MetaMask" message.
-     Submits via signUp(), advances to verifying.
 
-  3. Verifying
-     Spinner + rotating messages while Circle handles OTP and wallet
-     provisioning. Auto-advances when user.walletAddress lands.
+Dependencies (should already be in repo)
 
-  4. Wallet ready
-     Shows the new wallet address with copy button + Arcscan link.
-     Shows USDC balance, live, refetching every 5 seconds so a faucet
-     drop lands visibly. Fund Wallet button opens existing modal.
-     Continue button to advance, with copy that adapts to funded state.
+  Slice 2 imports the following components from prior batches. They should
+  exist already after pushing commits 1-17:
+    components/claimr/empty-state.tsx
+    components/claimr/skeleton.tsx
+    components/claimr/error-callout.tsx
+    components/primitives/state-pill.tsx
+    components/primitives/animated-number.tsx
+    lib/errors.ts
+    lib/motion.ts
 
-  5. Profile (optional, skippable)
-     Name + X handle + bio. Saves to localStorage profile store.
-     Skip and they go straight to dashboard.
-
-Hero CTAs on landing already pass ?role=creator or ?role=project, so
-the role step is skipped for users coming from those links. Anyone
-hitting /onboarding without a role param sees the role picker first.
+  If any are missing, the page won't compile. Tell me which one and I'll
+  include it in the next zip.
 
 
 Apply
 
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice1-onboarding.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr
-  git add -A
-  git commit -m "slice 1: onboarding rebuilt (stepper, wallet provisioning state, fund step, optional profile)"
-  git push https://iam25th1@github.com/iam25th1/claimr.git
+  Move zip from Downloads to GitHub folder if it landed there:
+    Move-Item C:\Users\Bright\Downloads\claimr-slice2-project.zip C:\Users\Bright\Documents\GitHub\
+
+  Extract:
+    cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice2-project.zip -DestinationPath claimr
+
+  Verify git sees the changes:
+    cd C:\Users\Bright\Documents\GitHub\claimr ; git status
+
+  Should list:
+    new file:   components/claimr/page-header.tsx
+    new file:   components/claimr/post-job-stepper.tsx
+    new file:   components/claimr/project-jobs-table.tsx
+    modified:   app/project/page.tsx
+    modified:   app/project/post/page.tsx
+    modified:   app/project/jobs/page.tsx
+
+  Commit and push:
+    git add -A ; git commit -m "slice 2: project owner experience (overview composition, post stepper, jobs table)" ; git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
 Next
 
-Slice 2 = project owner experience (overview, post, jobs, escrow, analytics) all rebuilt to the same standard.
-Slice 3 = creator experience (dashboard, discover, my-jobs, wallet, earnings).
+Slice 3 = creator-side rebuild (dashboard home, discover, my-jobs, wallet, earnings).
 Mobile pass after Slice 3.
