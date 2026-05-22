@@ -108,7 +108,7 @@ export function ProjectJobCards() {
               </div>
 
               <button
-                onClick={() => router.push("/project/jobs")}
+                onClick={() => router.push(`/project/jobs/${job.id}`)}
                 className="shrink-0 rounded-lg border border-[#2D6EFF] px-4 py-2 text-sm font-medium text-[#2D6EFF] transition-all hover:bg-[#2D6EFF]/10"
               >
                 View Submissions

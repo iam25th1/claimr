@@ -1,87 +1,124 @@
-Finish batch - escrow payout animation + LivingBackground + drop build mask
-=============================================================================
+Phase A admin panel + project owner detail page
+=================================================
 
 What this ships
 ---------------
 
-NEW FILE:
-  components/claimr/escrow-payout-flight.tsx   the USDC fly-to-creator overlay
+NEW FILES (11):
+  lib/admin-auth.ts                          allowlist parsing helper
+  components/claimr/admin-sidebar.tsx        admin nav sidebar
+  app/admin/layout.tsx                       admin layout with auth gate
+  app/admin/page.tsx                         platform overview
+  app/admin/jobs/page.tsx                    all jobs table with filter/search
+  app/admin/jobs/[id]/page.tsx               admin job detail
+  app/admin/wallets/page.tsx                 wallet activity aggregate
+  app/admin/activity/page.tsx                live verifier + state-change feed
+  app/admin/verifier/page.tsx                verifier queue + decisions + config
+  app/api/admin/activity/route.ts            exposes verifier log to /admin/activity
+  app/project/jobs/[id]/page.tsx             project owner job detail
 
-PATCHES:
-  app/project/escrow/page.tsx
-    - 3 stat counters animate via AnimatedNumber
-    - StatePill replaces inline status spans
-    - rows layout-animate in/out of an AnimatePresence
-    - EscrowPayoutFlight overlay on each row, fires on status 2 -> 3
+PATCHES (2):
+  components/claimr/project-job-cards.tsx    View Submissions navigates to detail
+  app/project/jobs/page.tsx                  same, plus useRouter import
 
-  app/project/layout.tsx
-  app/dashboard/layout.tsx
-    - static blur-blob divs replaced with <LivingBackground />
 
-  next.config.mjs
-    - ignoreBuildErrors: true removed
-    - project already type-checks clean under strict mode (verified before
-      this patch was authored)
+CRITICAL: set the admin allowlist before testing
+------------------------------------------------
 
-Idempotent. Self-deletes on success. Stays in place on failure for
-inspection.
+Without NEXT_PUBLIC_ADMIN_WALLETS set, every signed-in user gets redirected
+out of /admin. Set yourself first.
+
+1. In `.env.local` at the repo root, add:
+
+      NEXT_PUBLIC_ADMIN_WALLETS=0xYOUR_WALLET_HERE
+
+   Comma-separated to allow multiple wallets. Lowercased or mixed-case
+   both work.
+
+2. In Vercel project env (Settings -> Environment Variables), add the same
+   var for Production, Preview, and Development.
 
 
 Apply
 -----
 
 1. Zip lands at:
-   C:\Users\Bright\Documents\GitHub\claimr-finish.zip
+      C:\Users\Bright\Documents\GitHub\claimr-admin.zip
 
-2. Extract over the repo (one new source file + the apply script):
+2. Extract into the repo:
 
-   cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-finish.zip -DestinationPath claimr
+      cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-admin.zip -DestinationPath claimr
 
-   If git status shows nothing after, use File Explorer extract instead.
+   If `git status` shows nothing after, fall back to File Explorer extract
+   with overwrite into `claimr`.
 
-3. Apply patches from the repo root:
+3. Apply the two surgical patches:
 
-   cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-finish.js
+      cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-admin.js
 
 
-Full local test
----------------
+Test (after setting NEXT_PUBLIC_ADMIN_WALLETS)
+-----------------------------------------------
 
-   npm run build
-
-   Should succeed without the ignoreBuildErrors safety net. If a type error
-   surfaces, it was already there and previously hidden. Paste it and we
-   fix it.
-
+   npm run build         # strict TS, should pass
    npm run dev
 
-   - / and /project           LivingBackground field is rendering. Move
-                              the cursor, the field shifts slightly.
-                              Switch tabs and back, animation pauses then
-                              resumes.
+Then in browser:
 
-   - /project                 escrow hero number breathes (3.6s scale
-                              loop) and counts up on first paint.
+   /admin                Overview. Hero counters animate. Verifier queue.
+                         Recent jobs list, each linking into the detail.
 
-   - /project/escrow          three stat counters animate. Rows have
-                              StatePill. To test the payout flight
-                              without a real chain event, open devtools
-                              console and dispatch:
+   /admin/jobs           Table of every job. Filter chips. Search box.
+                         Click a row -> /admin/jobs/[id].
 
-                              window.dispatchEvent(new CustomEvent('claimr:replay-payout', { detail: { jobId: 1 } }))
+   /admin/jobs/[id]      Full job detail. Verification log (or "no
+                         reasoning logged" if Lambda cold-started since).
+                         Arcscan link on every address.
 
-                              (replace 1 with an actual job id). A +X USDC
-                              coin flies from the right side of that row
-                              to the left, with a green ripple landing at
-                              the creator side.
+   /admin/wallets        Every wallet that's touched the contract.
+                         Sortable by Recent / Most posted / Most earned.
+                         Search by address.
 
-   - /project/jobs            StatePill on each card, smooth row entrance
-   - /dashboard               LivingBackground rendering, all motion
-                              wiring from the earlier batch active
-   - /dashboard/my-jobs       StatePill near each title
+   /admin/activity       Live feed of verifier decisions + state changes.
+                         Auto-refreshes every 8s.
+
+   /admin/verifier       Currently-reviewing queue (auto-refresh 5s),
+                         counters, recent decisions, config panel.
+
+   /admin/seed           Existing demo seeder, now gated by the admin
+                         allowlist instead of plain "authenticated".
+
+   /project/jobs/[id]    NEW: Project owner detail page. Sign in as a
+                         project that has jobs, click "View Submissions"
+                         from /project or /project/jobs. Non-owners get
+                         redirected to /project.
+
+
+Negative test (gate works)
+---------------------------
+
+Sign in with a wallet that's NOT in NEXT_PUBLIC_ADMIN_WALLETS, then visit
+/admin or any sub-route. You should briefly see the "Admin access only"
+panel then redirect to /dashboard.
+
+
+What's NOT in Phase A (deferred to Phase B)
+--------------------------------------------
+
+- Write actions (manual approve/reject, refund stuck escrow, edit verifier
+  prompt at runtime, pause/unpause, ban wallets)
+- Server-side gate on /api/admin/* endpoints (the read-only ones don't
+  need it; writes will)
+- Persisted verifier reasoning (currently in-memory Map that resets on
+  Lambda cold-start; Phase B = Vercel KV)
+- Full chain tx history (current "activity" is verifier decisions +
+  derived state changes from useJobs; real indexer is Phase B)
 
 
 Commit + push
 -------------
 
-   cd C:\Users\Bright\Documents\GitHub\claimr ; git add -A ; git commit -m "batch 1 finish: payout flight, living background, strict build" ; git push https://iam25th1@github.com/iam25th1/claimr.git
+   cd C:\Users\Bright\Documents\GitHub\claimr
+   git add -A
+   git commit -m "admin: phase a (overview, jobs, wallets, activity, verifier) + project job detail"
+   git push https://iam25th1@github.com/iam25th1/claimr.git

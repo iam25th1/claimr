@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Briefcase, Clock, Eye, Users } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
@@ -47,6 +48,7 @@ export default function ActiveJobsPage() {
   const { user } = useAuth();
   const address = user?.walletAddress;
   const { jobs, isLoading } = useJobs();
+  const router = useRouter();
 
   const filters = ["All", "Open", "In Progress", "Pending Review", "Completed"];
 
@@ -155,7 +157,10 @@ export default function ActiveJobsPage() {
                         )}
                       </div>
 
-                      <button className="flex items-center gap-2 rounded-lg border border-[#2D6EFF]/30 bg-[#2D6EFF]/10 px-4 py-2 text-sm font-medium text-[#2D6EFF] transition-all hover:bg-[#2D6EFF]/20">
+                      <button
+                        onClick={() => router.push(`/project/jobs/${job.id}`)}
+                        className="flex items-center gap-2 rounded-lg border border-[#2D6EFF]/30 bg-[#2D6EFF]/10 px-4 py-2 text-sm font-medium text-[#2D6EFF] transition-all hover:bg-[#2D6EFF]/20"
+                      >
                         <Eye className="h-4 w-4" />
                         View Submissions
                       </button>
