@@ -4,6 +4,7 @@ import { PostJobCTA } from "@/components/claimr/post-job-cta";
 import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
 import { HeroEscrowNumber } from "@/components/claimr/hero-escrow-number";
 import { RecentActivity } from "@/components/claimr/recent-activity";
+import { VerifierCard } from "@/components/claimr/verifier-card";
 
 export default function ProjectDashboard() {
   return (
@@ -18,6 +19,9 @@ export default function ProjectDashboard() {
 
       {/* Hero: total locked in escrow */}
       <HeroEscrowNumber />
+
+      {/* AI verifier state — renders only when there's something to show */}
+      <VerifierCard />
 
       {/* Wallet address + funding moment */}
       <WalletAddressCard />
