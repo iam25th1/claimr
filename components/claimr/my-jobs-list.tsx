@@ -119,7 +119,7 @@ export function MyJobsList() {
                           Verified & Paid ({earned} USDC)
                         </span>
                       ) : job.status === 2 ? (
-                        <span className="text-sm text-yellow-400">Work submitted — awaiting review</span>
+                        <span className="text-sm text-yellow-400">Work submitted, awaiting review.</span>
                       ) : (
                         <span className="text-sm text-muted-foreground">In progress</span>
                       )}

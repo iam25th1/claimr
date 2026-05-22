@@ -47,7 +47,7 @@ if (!mounted) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
           <p className="text-xs text-muted-foreground">
-            {authenticated ? "Signed in" : "Connected"}
+            {authenticated ? "Signed in" : "Sign in"}
           </p>
         </div>
         <button

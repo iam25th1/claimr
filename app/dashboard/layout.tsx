@@ -15,7 +15,9 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="pl-64">
-        <div className="relative min-h-screen p-8">{children}</div>
+        <div className="relative min-h-screen p-8">
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </div>
       </main>
     </div>
   );

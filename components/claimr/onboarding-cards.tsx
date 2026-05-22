@@ -45,6 +45,10 @@ export function OnboardingCards() {
       ? "Lock USDC in escrow. We release it to creators only when AI verifies their work matches your brief."
       : "Browse open jobs, complete the work, submit your proof. AI verifies, USDC lands in your wallet.";
 
+  // flow-fix: explicit "no MetaMask needed" callout since the app dropped
+  // injected wallets in favor of Circle embedded wallets
+  const walletCallout = "We create a Circle wallet for you when you sign up. No MetaMask, no seed phrase, no browser extension.";
+
   return (
     <div className="mx-auto max-w-md px-6 pt-32 pb-24">
       <div className="text-center mb-10">
@@ -53,6 +57,11 @@ export function OnboardingCards() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-white">{heading}</h1>
         <p className="mt-3 text-[#a1a1aa]">{subheading}</p>
+      </div>
+
+      <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#2D6EFF]/20 bg-[#2D6EFF]/5 p-4">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-[#2D6EFF] mt-0.5" />
+        <p className="text-xs text-foreground/80 leading-relaxed">{walletCallout}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

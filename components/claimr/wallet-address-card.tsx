@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Copy, Check, ExternalLink, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { FundWalletModal } from "./fund-wallet-modal";
+import { useReadContract } from "wagmi";
+import { formatUnits } from "viem";
+import { USDC_ADDRESS, USDC_ABI } from "@/lib/contracts";
 
 // Prominent address card that lives at the top of the wallet page.
 // Solves the funding-confusion problem: users now see exactly which
@@ -16,6 +19,20 @@ export function WalletAddressCard() {
   const [fundOpen, setFundOpen] = useState(false);
 
   const address = user?.walletAddress;
+
+  // USDC balance live from chain. Reads even before auth resolves so the
+  // value lands as soon as the address is known.
+  const { data: usdcRaw } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: USDC_ABI,
+    functionName: "balanceOf",
+    args: [address as `0x${string}`],
+    query: { enabled: !!address },
+  });
+  const usdcBalance = usdcRaw
+    ? Number(formatUnits(usdcRaw as bigint, 6)).toFixed(2)
+    : "0.00";
+
   if (!address) return null;
 
   const handleCopy = async () => {
@@ -36,12 +53,18 @@ export function WalletAddressCard() {
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
               Your Claimr wallet
             </p>
-            <p className="font-mono text-base text-foreground break-all mb-3">
+            <p className="font-mono text-sm text-foreground break-all mb-3">
               {address}
             </p>
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 w-fit">
+              <span className="text-xs text-muted-foreground">USDC balance</span>
+              <span className="font-mono text-sm font-semibold text-foreground">
+                {usdcBalance}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               This is the wallet your Claimr account controls on Arc Testnet. Only send funds to
-              this exact address — funds sent elsewhere can't be recovered.
+              this exact address. Funds sent elsewhere can't be recovered.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

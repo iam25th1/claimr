@@ -80,7 +80,7 @@ export function ProjectSidebar() {
               <div className="flex items-center gap-1 mt-0.5">
                 <BadgeCheck className="h-3.5 w-3.5 text-[#2D6EFF]" />
                 <p className="text-xs text-[#2D6EFF]">
-                  {authenticated ? "Verified Project" : "Connected"}
+                  {authenticated ? "Verified Project" : "Sign in"}
                 </p>
               </div>
             </div>

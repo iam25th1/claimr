@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Briefcase, Clock, Eye, Users } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
 import { useAuth } from "@/lib/auth";
@@ -61,12 +60,9 @@ export default function ActiveJobsPage() {
       ? myJobs
       : myJobs.filter((j) => STATUS_LABELS[j.status] === filter);
 
+  // flow-fix: layout cleanup
   return (
-    <div className="flex min-h-screen bg-background">
-      <ProjectSidebar />
-
-      <main className="ml-64 flex-1 p-8">
-        <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Active Jobs</h1>
             <p className="mt-2 text-muted-foreground">Track all jobs you've posted</p>
@@ -196,8 +192,6 @@ export default function ActiveJobsPage() {
               )}
             </div>
           )}
-        </div>
-      </main>
     </div>
   );
 }

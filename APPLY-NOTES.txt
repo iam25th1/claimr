@@ -1,124 +1,114 @@
-Phase A admin panel + project owner detail page
-=================================================
+Flow rescue batch
+==================
 
-What this ships
----------------
+What this fixes (from the live audit, in priority order)
 
-NEW FILES (11):
-  lib/admin-auth.ts                          allowlist parsing helper
-  components/claimr/admin-sidebar.tsx        admin nav sidebar
-  app/admin/layout.tsx                       admin layout with auth gate
-  app/admin/page.tsx                         platform overview
-  app/admin/jobs/page.tsx                    all jobs table with filter/search
-  app/admin/jobs/[id]/page.tsx               admin job detail
-  app/admin/wallets/page.tsx                 wallet activity aggregate
-  app/admin/activity/page.tsx                live verifier + state-change feed
-  app/admin/verifier/page.tsx                verifier queue + decisions + config
-  app/api/admin/activity/route.ts            exposes verifier log to /admin/activity
-  app/project/jobs/[id]/page.tsx             project owner job detail
+  1. Content centering. Project + dashboard layouts now wrap children in
+     max-w-6xl mx-auto. Forms (settings) explicitly narrower at max-w-2xl
+     inside the wrapper.
 
-PATCHES (2):
-  components/claimr/project-job-cards.tsx    View Submissions navigates to detail
-  app/project/jobs/page.tsx                  same, plus useRouter import
+  2. Double-sidebar bug. /project/post, /project/jobs, /project/escrow,
+     and /project/analytics each rendered ProjectSidebar + their own
+     <main className="ml-64"> wrapper on TOP of the layout's. Content was
+     pushed 128px off-center. Each sub-page now returns just its content.
+
+  3. WalletAddressCard shows live USDC balance. Visible everywhere the
+     card lives: /project, /dashboard/wallet, /project/escrow. Funded
+     users finally see the result.
+
+  4. Sidebars stop lying. "Connected" replaced with "Sign in" when no
+     auth. Both creator-side and project-side fixed.
+
+  5. /project/settings rebuilt. Real form: name, tagline, website, X
+     handle, description. Saves to localStorage keyed by wallet. The
+     ArcSwap/team@arcswap hardcoded mock is gone.
+
+  6. /dashboard/settings rebuilt. Real form: display name, X handle,
+     bio, payout address, notification toggles. The jenzy.eth / Turnkey
+     mock is gone. (Turnkey reference was wrong - wallet is Circle.)
+
+  7. Navbar "Launch App" routes based on auth state. Signed in goes to
+     /dashboard/discover. Signed out gets sent to /onboarding?role=creator
+     and the button label reads "Sign in" instead.
+
+  8. Onboarding has a "we create a wallet for you, no MetaMask needed"
+     callout below the subheading.
+
+  9. Em dash scrub on user-facing strings (my-jobs-list pending text).
 
 
-CRITICAL: set the admin allowlist before testing
-------------------------------------------------
+Files
 
-Without NEXT_PUBLIC_ADMIN_WALLETS set, every signed-in user gets redirected
-out of /admin. Set yourself first.
+  NEW
+    lib/profile-store.ts                       Profile read/write helpers
 
-1. In `.env.local` at the repo root, add:
+  REBUILT (zip overwrites the files)
+    app/project/settings/page.tsx
+    components/claimr/settings-content.tsx
 
-      NEXT_PUBLIC_ADMIN_WALLETS=0xYOUR_WALLET_HERE
-
-   Comma-separated to allow multiple wallets. Lowercased or mixed-case
-   both work.
-
-2. In Vercel project env (Settings -> Environment Variables), add the same
-   var for Production, Preview, and Development.
-
+  SURGICAL PATCHES (apply-flow-fix.js)
+    app/dashboard/layout.tsx
+    app/project/layout.tsx
+    app/project/post/page.tsx
+    app/project/jobs/page.tsx
+    app/project/escrow/page.tsx
+    app/project/analytics/page.tsx
+    components/claimr/dashboard-sidebar.tsx
+    components/claimr/project-sidebar.tsx
+    components/claimr/navbar.tsx
+    components/claimr/wallet-address-card.tsx
+    components/claimr/onboarding-cards.tsx
+    components/claimr/my-jobs-list.tsx
 
 Apply
------
 
-1. Zip lands at:
-      C:\Users\Bright\Documents\GitHub\claimr-admin.zip
+  1. Zip lands at:
+       C:\Users\Bright\Documents\GitHub\claimr-flow-fix.zip
 
-2. Extract into the repo:
+  2. Extract:
+       cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-flow-fix.zip -DestinationPath claimr
 
-      cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-admin.zip -DestinationPath claimr
+     If git status is clean after, use File Explorer extract instead.
 
-   If `git status` shows nothing after, fall back to File Explorer extract
-   with overwrite into `claimr`.
+  3. Apply patches:
+       cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-flow-fix.js
 
-3. Apply the two surgical patches:
+  4. Verify:
+       npm run build      # strict TS, should still pass
+       npm run dev
 
-      cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-admin.js
+Test list (in browser, signed in as a project)
 
+  /                  Launch App button label reads correctly per auth
+  /onboarding?role=creator    has the "no MetaMask" callout block
+  /project           hero number visible, WalletAddressCard shows USDC
+  /project/jobs      content centered, no double sidebar offset
+  /project/escrow    content centered, stat counters + payout flight live
+  /project/post      form centered, ErrorCallout still wired
+  /project/analytics content centered
+  /project/settings  real form, fill in name + X handle, click Save,
+                     reload page, values persist
+  /dashboard         content centered
+  /dashboard/my-jobs content centered, no off-right offset
+  /dashboard/settings real form (display name + X + bio + payout),
+                     no jenzy / Turnkey hardcoded data
 
-Test (after setting NEXT_PUBLIC_ADMIN_WALLETS)
------------------------------------------------
-
-   npm run build         # strict TS, should pass
-   npm run dev
-
-Then in browser:
-
-   /admin                Overview. Hero counters animate. Verifier queue.
-                         Recent jobs list, each linking into the detail.
-
-   /admin/jobs           Table of every job. Filter chips. Search box.
-                         Click a row -> /admin/jobs/[id].
-
-   /admin/jobs/[id]      Full job detail. Verification log (or "no
-                         reasoning logged" if Lambda cold-started since).
-                         Arcscan link on every address.
-
-   /admin/wallets        Every wallet that's touched the contract.
-                         Sortable by Recent / Most posted / Most earned.
-                         Search by address.
-
-   /admin/activity       Live feed of verifier decisions + state changes.
-                         Auto-refreshes every 8s.
-
-   /admin/verifier       Currently-reviewing queue (auto-refresh 5s),
-                         counters, recent decisions, config panel.
-
-   /admin/seed           Existing demo seeder, now gated by the admin
-                         allowlist instead of plain "authenticated".
-
-   /project/jobs/[id]    NEW: Project owner detail page. Sign in as a
-                         project that has jobs, click "View Submissions"
-                         from /project or /project/jobs. Non-owners get
-                         redirected to /project.
+Sign out, hit /project sidebar - should read "Sign in" at the bottom
+instead of "Connected".
 
 
-Negative test (gate works)
----------------------------
+What's NOT in this batch
 
-Sign in with a wallet that's NOT in NEXT_PUBLIC_ADMIN_WALLETS, then visit
-/admin or any sub-route. You should briefly see the "Admin access only"
-panel then redirect to /dashboard.
+  - X OAuth (manual @handle input only, OAuth is a separate batch with
+    Twitter Dev app setup)
+  - Cross-device profile sync (localStorage only; Vercel KV swap later)
+  - Notification delivery wiring (preferences saved, no email/push yet)
+  - Onboarding rebuild beyond the MetaMask callout
+  - Mobile responsive pass
 
+Commit and push
 
-What's NOT in Phase A (deferred to Phase B)
---------------------------------------------
-
-- Write actions (manual approve/reject, refund stuck escrow, edit verifier
-  prompt at runtime, pause/unpause, ban wallets)
-- Server-side gate on /api/admin/* endpoints (the read-only ones don't
-  need it; writes will)
-- Persisted verifier reasoning (currently in-memory Map that resets on
-  Lambda cold-start; Phase B = Vercel KV)
-- Full chain tx history (current "activity" is verifier decisions +
-  derived state changes from useJobs; real indexer is Phase B)
-
-
-Commit + push
--------------
-
-   cd C:\Users\Bright\Documents\GitHub\claimr
-   git add -A
-   git commit -m "admin: phase a (overview, jobs, wallets, activity, verifier) + project job detail"
-   git push https://iam25th1@github.com/iam25th1/claimr.git
+  cd C:\Users\Bright\Documents\GitHub\claimr
+  git add -A
+  git commit -m "flow rescue: centering, balance visibility, real settings, sidebar fix, onboarding callout"
+  git push https://iam25th1@github.com/iam25th1/claimr.git

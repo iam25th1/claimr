@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { Logo } from "@/components/claimr/logo";
+import { useAuth } from "@/lib/auth";
 
 export function Navbar() {
+  const { authenticated } = useAuth();
+  const launchHref = authenticated ? "/dashboard/discover" : "/onboarding?role=creator";
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
       <div className="mx-auto max-w-6xl flex items-center justify-between">
@@ -16,8 +19,8 @@ export function Navbar() {
           <Link href="/#how-it-works" className="hover:text-white transition-colors">How it Works</Link>
           <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
         </div>
-        <Link href="/dashboard/discover" className="px-4 py-2 text-sm font-medium text-white bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
-          Launch App
+        <Link href={launchHref} className="px-4 py-2 text-sm font-medium text-white bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
+          {authenticated ? "Launch App" : "Sign in"}
         </Link>
       </div>
     </nav>

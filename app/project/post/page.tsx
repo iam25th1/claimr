@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseUnits } from "viem";
-import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { ArrowRight, DollarSign, Calendar, Target, Lock, Loader2, CheckCircle2 } from "lucide-react";
 import { CLAIMR_ESCROW_ADDRESS, USDC_ADDRESS } from "@/lib/contracts";
 import { useAuth } from "@/lib/auth";
@@ -86,12 +85,9 @@ export default function PostJobPage() {
     return <>Post Job & Lock USDC in Escrow <ArrowRight className="h-4 w-4" /></>;
   };
 
+  // flow-fix: layout cleanup, project layout now provides the sidebar shell
   return (
-    <div className="flex min-h-screen bg-background">
-      <ProjectSidebar />
-
-      <main className="ml-64 flex-1 p-8">
-        <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Post a New Job</h1>
             <p className="mt-2 text-muted-foreground">
@@ -280,8 +276,6 @@ export default function PostJobPage() {
               {getButtonContent()}
             </button>
           </form>
-        </div>
-      </main>
     </div>
   );
 }

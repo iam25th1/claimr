@@ -1,6 +1,5 @@
 "use client";
 
-import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Lock, TrendingUp, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
 import { CLAIMR_ESCROW_ADDRESS } from "@/lib/contracts";
@@ -27,12 +26,9 @@ export default function EscrowPage() {
     .filter(j => j.status === 3) // Completed
     .reduce((sum, j) => sum + j.amount, 0);
 
+  // flow-fix: layout cleanup
   return (
-    <div className="flex min-h-screen bg-background">
-      <ProjectSidebar />
-
-      <main className="ml-64 flex-1 p-8">
-        <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
           <div className="mb-8 flex items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Escrow</h1>
@@ -159,8 +155,6 @@ export default function EscrowPage() {
               </div>
             )}
           </div>
-        </div>
-      </main>
     </div>
   );
 }
