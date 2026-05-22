@@ -71,7 +71,9 @@ export function OnboardingCards() {
   const [mode, setMode] = useState<Mode>(urlMode);
   const [role, setRole] = useState<Role | null>(urlRole);
   const [step, setStep] = useState<Step>(() => {
-    if (authenticated) return mode === "signup" ? "wallet" : "email";
+    // For authenticated users the redirect effect above takes over.
+    // Initial step just needs to be valid - we won't actually render it.
+    if (authenticated) return "email";
     if (mode === "signin") return "email";
     return urlRole ? "email" : "role";
   });
@@ -79,13 +81,15 @@ export function OnboardingCards() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Bounce if already authenticated and they came in for sign-in.
+  // authenticated bounce: send any signed-in user straight to their
+  // dashboard. Returning users (visiting /onboarding from a bookmark or
+  // landing-page CTA) should not be forced through the signup flow again.
   useEffect(() => {
     if (!ready) return;
-    if (authenticated && mode === "signin") {
+    if (authenticated) {
       router.replace(role === "project" ? "/project" : "/dashboard/discover");
     }
-  }, [ready, authenticated, mode, role, router]);
+  }, [ready, authenticated, role, router]);
 
   // Verifying -> next step when wallet is ready.
   useEffect(() => {

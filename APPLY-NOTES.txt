@@ -1,50 +1,42 @@
-Auth fix v2 - widen "already initialized" catch
+Auth fix v3 - returning user flow
 
-What's in your error log: "Could not start PIN challenge: The user had
-already been initialized." That's Circle rejecting the createUserPinWithWallets
-call because the user's PIN and wallet are both already set up. My
-previous catch only checked numeric error codes (155206, 155709) and
-Circle returned a different code for this case.
+Two bugs that combine to send signed-in users through onboarding every
+time they hit the landing page:
 
-This patch broadens the detection to also match the error message text,
-which is more reliable across Circle's various endpoint variants.
+  1. Hero CTAs ("I'm a Creator" / "I'm a Project") always linked to
+     /onboarding, regardless of auth state.
+  2. /onboarding only redirected authenticated users when mode=signin.
+     For signup mode (the default, what the Hero CTAs use), it fast-
+     forwarded them to the Wallet ready step instead of dashboard.
 
-Patterns now caught:
-  - code 155206 (pinAlreadySet)
-  - code 155207 (userInitialized)
-  - code 155709 (walletAlreadyExists)
-  - any message containing "already initialized" / "already been initialized"
-  - any message containing "already set" / "already exists"
-  - any message containing "wallet already"
+Fixes:
 
-When isAlreadyInit fires, the route returns alreadyInitialized=true and
-the client (providers.tsx, already shipped in the previous batch) skips
-the PIN sheet and goes straight to finalize, which looks up the existing
-wallet for that email and sets the session cookie.
+  components/claimr/hero.tsx                REBUILT
+    Detects auth state. When authenticated, swaps the CTAs to
+    "Go to creator dashboard" -> /dashboard/discover
+    "Go to project dashboard" -> /project
+    When signed out, keeps the original creator/project signup CTAs.
 
-Net effect: returning users sign in without seeing this error. The first-
-time PIN sheet still fires for genuinely new users.
+  components/claimr/onboarding-cards.tsx    PATCHED
+    The "bounce authenticated user away" effect now fires for any
+    authenticated user, not just mode=signin. Initial step state
+    also no longer fast-forwards to wallet for authenticated visitors.
+
+
+What returning users will experience after this
+
+  Visit /                  Hero shows "Go to creator dashboard" + "Go to project dashboard"
+  Click either             Lands in that dashboard, no detour
+  Visit /onboarding        Bounced immediately to dashboard
+  Visit /onboarding?role=X Bounced to /dashboard or /project
+  Click Launch App         Already auth-aware from earlier batch, goes to dashboard
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-auth-fix-v2.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-auth-fix-v2.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-auth-fix-2.js
+  Move-Item C:\Users\Bright\Downloads\claimr-auth-fix-v3.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-auth-fix-v3.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-auth-fix-3.js
   git add -A
-  git commit -m "auth: widen already-initialized detection in onboard route"
+  git commit -m "auth: bounce returning users to dashboard from landing + onboarding"
   git push https://iam25th1@github.com/iam25th1/claimr.git
-
-
-After this deploys, try signing in again with the same email. You should
-see the wallet step appear instead of the error toast.
-
-
-If you see a NEW error after this
-
-Most likely candidates:
-  1. Finalize fails because the wallet lookup takes a beat to propagate
-     after createUser. The route returns 503 "Wallet not yet provisioned,
-     retry shortly" in that case. Refresh and try again.
-  2. Some other Circle error. The new error surface includes the actual
-     message now, so paste it to me and we'll handle that one too.
