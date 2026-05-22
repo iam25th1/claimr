@@ -1,8 +1,10 @@
 "use client"
 
 import { useJobs } from "@/lib/useJobs"
-import { ArrowDownRight, RefreshCw } from "lucide-react"
+import { ArrowDownRight, Receipt, RefreshCw } from "lucide-react"
 import { useAuth } from "@/lib/auth";
+import { EmptyState } from "@/components/claimr/empty-state";
+import { TransactionRowSkeleton } from "@/components/claimr/skeleton";
 
 export function TransactionsList() {
   const { user } = useAuth();
@@ -33,16 +35,20 @@ export function TransactionsList() {
       <h2 className="text-lg font-semibold text-foreground mb-6">Recent Transactions</h2>
 
       {isLoading && (
-        <p className="text-center text-muted-foreground text-sm">Loading...</p>
+        <div>
+          <TransactionRowSkeleton />
+          <TransactionRowSkeleton />
+          <TransactionRowSkeleton />
+        </div>
       )}
 
       {!isLoading && payments.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">No transactions yet.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Completed jobs will appear here.
-          </p>
-        </div>
+        <EmptyState
+          variant="inline"
+          icon={Receipt}
+          title="No transactions yet"
+          description="Payments from completed jobs will show up here."
+        />
       )}
 
       {!isLoading && payments.length > 0 && (

@@ -8,6 +8,7 @@ import { ArrowRight, DollarSign, Calendar, Target, Lock, Loader2, CheckCircle2 }
 import { CLAIMR_ESCROW_ADDRESS, USDC_ADDRESS } from "@/lib/contracts";
 import { useAuth } from "@/lib/auth";
 import { useCircleWrite } from "@/lib/useCircleWrite";
+import { ErrorCallout } from "@/components/claimr/error-callout";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -105,9 +106,11 @@ export default function PostJobPage() {
           )}
 
           {errorMsg && (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
-              Transaction failed: {errorMsg}
-            </div>
+            <ErrorCallout
+              error={errorMsg}
+              className="mb-6"
+              onRetry={() => setErrorMsg(null)}
+            />
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">

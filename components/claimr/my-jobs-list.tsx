@@ -3,8 +3,10 @@
 import { useState } from "react"
 import { useJobs } from "@/lib/useJobs"
 import { useAuth } from "@/lib/auth"
-import { Clock, CheckCircle, ArrowRight } from "lucide-react"
+import { ArrowRight, Briefcase, CheckCircle, Clock, Inbox } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { EmptyState } from "@/components/claimr/empty-state"
+import { MyJobRowSkeleton } from "@/components/claimr/skeleton"
 
 const tabs = [
   { id: "active",    label: "Active" },
@@ -39,8 +41,10 @@ export function MyJobsList() {
 
   if (isLoading) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center">
-        <p className="text-muted-foreground">Loading your jobs from chain...</p>
+      <div className="flex flex-col gap-4">
+        <MyJobRowSkeleton />
+        <MyJobRowSkeleton />
+        <MyJobRowSkeleton />
       </div>
     )
   }
@@ -145,15 +149,35 @@ export function MyJobsList() {
         })}
 
         {filteredJobs.length === 0 && (
-          <div className="glass-card rounded-xl p-8 text-center">
-            <p className="text-muted-foreground">
-              {activeTab === "active"
-                ? "No active jobs. Head to Discover to claim one."
+          <EmptyState
+            variant="card"
+            icon={
+              activeTab === "active"
+                ? Briefcase
                 : activeTab === "pending"
-                ? "No jobs pending review."
-                : "No completed jobs yet."}
-            </p>
-          </div>
+                ? Inbox
+                : CheckCircle
+            }
+            title={
+              activeTab === "active"
+                ? "No active jobs"
+                : activeTab === "pending"
+                ? "Nothing pending review"
+                : "No completed jobs yet"
+            }
+            description={
+              activeTab === "active"
+                ? "Claim a job from Discover to start earning USDC."
+                : activeTab === "pending"
+                ? "Jobs you have submitted will show here while the AI verifier checks them."
+                : "Completed jobs and earnings will appear here once paid out."
+            }
+            action={
+              activeTab === "active"
+                ? { label: "Browse Discover", href: "/dashboard/discover" }
+                : undefined
+            }
+          />
         )}
       </div>
     </div>

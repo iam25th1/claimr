@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
-import { Clock, Users, Eye } from "lucide-react";
+import { Briefcase, Clock, Eye, Users } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
 import { useAuth } from "@/lib/auth";
+import { EmptyState } from "@/components/claimr/empty-state";
+import { JobCardSkeleton } from "@/components/claimr/skeleton";
 
 const STATUS_LABELS: Record<number, string> = {
   0: "Open",
@@ -82,8 +84,10 @@ export default function ActiveJobsPage() {
           </div>
 
           {isLoading && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-12 text-center">
-              <p className="text-muted-foreground">Loading jobs from chain...</p>
+            <div className="space-y-3">
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+              <JobCardSkeleton />
             </div>
           )}
 
@@ -155,13 +159,28 @@ export default function ActiveJobsPage() {
               })}
 
               {filteredJobs.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-12 text-center">
-                  <p className="text-muted-foreground">
-                    {address
-                      ? "No jobs found. Post your first job to get started."
-                      : "Connect your wallet to see your jobs."}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={Briefcase}
+                  title={
+                    !address
+                      ? "Connect your wallet"
+                      : filter === "All"
+                      ? "No jobs posted yet"
+                      : `No ${filter.toLowerCase()} jobs`
+                  }
+                  description={
+                    !address
+                      ? "Sign in with your wallet to see jobs you have posted."
+                      : filter === "All"
+                      ? "Post your first job and lock USDC in escrow to start finding creators."
+                      : "Try a different filter, or post a new job."
+                  }
+                  action={
+                    address && filter === "All"
+                      ? { label: "Post a Job", href: "/project/post" }
+                      : undefined
+                  }
+                />
               )}
             </div>
           )}
