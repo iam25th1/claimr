@@ -1,21 +1,42 @@
-import { WalletHeader, WalletBalances } from "@/components/claimr/wallet-balances"
-import { SwapCard } from "@/components/claimr/swap-card"
-import { TransactionsList } from "@/components/claimr/transactions-list"
-import { WalletAddressCard } from "@/components/claimr/wallet-address-card"
+import { PageHeader, SectionHeader } from "@/components/claimr/page-header";
+import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
+import { WalletBalances } from "@/components/claimr/wallet-balances";
+import { TransactionsList } from "@/components/claimr/transactions-list";
+import { SwapCard } from "@/components/claimr/swap-card";
 
 export default function WalletPage() {
   return (
-    <div className="space-y-6">
-      <WalletHeader />
-      <WalletAddressCard />
-      <WalletBalances />
-      <TransactionsList />
-      <div className="border-t border-white/10 pt-6">
-        <p className="text-sm text-muted-foreground mb-4">Convert between stablecoins</p>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Creator"
+        title="Wallet"
+        subtitle="Your Claimr address, balances, and recent transactions."
+      />
+
+      <section>
+        <SectionHeader title="Address" />
+        <WalletAddressCard />
+      </section>
+
+      <section>
+        <SectionHeader title="Balances" />
+        <WalletBalances />
+      </section>
+
+      <section>
+        <SectionHeader title="Recent transactions" />
+        <TransactionsList />
+      </section>
+
+      <section>
+        <SectionHeader
+          title="Swap"
+          subtitle="Convert between stablecoins"
+        />
         <div className="max-w-md">
           <SwapCard />
         </div>
-      </div>
+      </section>
     </div>
-  )
+  );
 }

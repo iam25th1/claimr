@@ -1,18 +1,15 @@
-import { MyJobsList } from "@/components/claimr/my-jobs-list"
+import { PageHeader } from "@/components/claimr/page-header";
+import { MyJobsList } from "@/components/claimr/my-jobs-list";
 
 export default function MyJobsPage() {
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">My Jobs</h1>
-        <p className="mt-1 text-muted-foreground">
-          Track your active and completed work
-        </p>
-      </div>
-
-      {/* Jobs List */}
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Creator"
+        title="My jobs"
+        subtitle="Track active claims, submissions awaiting review, and completed work."
+      />
       <MyJobsList />
     </div>
-  )
+  );
 }

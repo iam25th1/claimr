@@ -1,91 +1,78 @@
-Slice 2 of 3 - Project owner experience
+Slice 3 of 3 - Creator experience
 
-Six files. All are drop-in replacements or new additions. No apply script.
+Six files. All drop-in replacements. No apply script.
 
-  NEW
-    components/claimr/page-header.tsx        shared PageHeader + SectionHeader
-    components/claimr/post-job-stepper.tsx   visual stepper for posting a job
-    components/claimr/project-jobs-table.tsx full table with filter + search
-
-  REBUILT (zip overwrites the existing files)
-    app/project/page.tsx       overview, new composition
-    app/project/post/page.tsx  thin wrapper using PostJobStepper
-    app/project/jobs/page.tsx  thin wrapper using ProjectJobsTable
+  REBUILT (zip overwrites)
+    app/dashboard/page.tsx                  home overview composition
+    app/dashboard/discover/page.tsx         job discovery composition
+    app/dashboard/my-jobs/page.tsx          my-jobs composition
+    app/dashboard/wallet/page.tsx           wallet composition
+    app/dashboard/earnings/page.tsx         earnings composition
+    components/claimr/earnings-chart.tsx    real chain data (was hardcoded)
 
 
 What changed and why
 
-/project (overview)
-  - Top: PageHeader with eyebrow + title + "Post a job" action button on
-    the right. Action is now where the user expects it, not stuck at the
-    bottom as PostJobCTA was.
-  - Sections each have their own SectionHeader with optional "See all" link
-  - Order: hero (escrow breathing number) -> wallet -> stats -> verifier
-    insight -> recent activity -> active jobs preview
-  - Removes the bottom PostJobCTA component (action moved to the header)
+/dashboard (home)
+  - PageHeader with "Welcome back, [name]" reading email or short wallet
+  - At a glance section heading above existing StatsCards
+  - Featured and Latest job sections each with "See all" -> discover
+  - No new components, just proper hierarchy and section headers
 
-/project/post (formerly a button-label flow)
-  - 4-step visible stepper: Details -> Criteria + pay -> Visibility -> Review + lock
-  - StepBar at the top shows progress with done/active/upcoming states
-  - Review step shows a complete summary before the lock action
-  - During the on-chain action, an explicit "Approving USDC -> Locking in escrow"
-    progress panel renders below the summary. No more guessing what the
-    button label means
-  - Errors use the friendly ErrorCallout (insufficient funds gets "Fund wallet"
-    button, indexing latency gets refresh, etc) instead of raw chain errors
+/dashboard/discover
+  - PageHeader, then the existing DiscoverFeed (search + featured + latest)
+  - Discover internals unchanged. They already pull real data via useJobs.
 
-/project/jobs (formerly an inline list)
-  - Proper table on desktop: ID, Job, Claimant, USDC, Status, ChevronRight
-  - Card layout on mobile (auto-collapse via responsive grid)
-  - Search box at the top: matches title, criteria, job id
-  - Filter pills: All / Open / Claimed / Under review / Paid
-  - Rows have layout animation when filter changes
-  - Each row links to /project/jobs/[id] (the detail page shipped in admin batch)
-  - Loading shows JobCardSkeleton x3
-  - Empty state copy adapts: "No jobs posted yet" with Post-a-Job CTA when
-    truly empty, vs "No [filter] jobs" with no CTA when just filtered out
+/dashboard/my-jobs
+  - PageHeader with new copy
+  - MyJobsList unchanged - already had StatePill, EmptyState, motion from
+    earlier batches
+
+/dashboard/wallet
+  - Sectioned: Address -> Balances -> Recent transactions -> Swap
+  - Replaces the old WalletHeader (which had its own h1) with the unified
+    PageHeader
+  - All child components unchanged
+
+/dashboard/earnings
+  - Sectioned: At a glance -> Monthly earnings -> Payment history
+  - EarningsChart is rebuilt entirely. Was hardcoded monthlyData =
+    [{month: "Dec", amount: 120}, ...]. Now reads real completed-job
+    payouts grouped by month, last 6 months, with animated bar growth
+    and an empty state for new creators.
 
 
-Dependencies (should already be in repo)
+Dependencies
 
-  Slice 2 imports the following components from prior batches. They should
-  exist already after pushing commits 1-17:
-    components/claimr/empty-state.tsx
-    components/claimr/skeleton.tsx
-    components/claimr/error-callout.tsx
-    components/primitives/state-pill.tsx
-    components/primitives/animated-number.tsx
-    lib/errors.ts
-    lib/motion.ts
-
-  If any are missing, the page won't compile. Tell me which one and I'll
-  include it in the next zip.
+  Requires components/claimr/page-header.tsx (added in Slice 2).
+  If Slice 2 wasn't pushed, run:
+    Move-Item C:\Users\Bright\Downloads\claimr-slice2-project.zip C:\Users\Bright\Documents\GitHub\
+    cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice2-project.zip -DestinationPath claimr
+  first.
 
 
 Apply
 
-  Move zip from Downloads to GitHub folder if it landed there:
-    Move-Item C:\Users\Bright\Downloads\claimr-slice2-project.zip C:\Users\Bright\Documents\GitHub\
-
-  Extract:
-    cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice2-project.zip -DestinationPath claimr
-
-  Verify git sees the changes:
-    cd C:\Users\Bright\Documents\GitHub\claimr ; git status
+  Move-Item C:\Users\Bright\Downloads\claimr-slice3-creator.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice3-creator.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; git status
 
   Should list:
-    new file:   components/claimr/page-header.tsx
-    new file:   components/claimr/post-job-stepper.tsx
-    new file:   components/claimr/project-jobs-table.tsx
-    modified:   app/project/page.tsx
-    modified:   app/project/post/page.tsx
-    modified:   app/project/jobs/page.tsx
+    modified:   app/dashboard/page.tsx
+    modified:   app/dashboard/discover/page.tsx
+    modified:   app/dashboard/my-jobs/page.tsx
+    modified:   app/dashboard/wallet/page.tsx
+    modified:   app/dashboard/earnings/page.tsx
+    modified:   components/claimr/earnings-chart.tsx
 
   Commit and push:
-    git add -A ; git commit -m "slice 2: project owner experience (overview composition, post stepper, jobs table)" ; git push https://iam25th1@github.com/iam25th1/claimr.git
+    git add -A ; git commit -m "slice 3: creator experience (home, discover, my-jobs, wallet, earnings)" ; git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
 Next
 
-Slice 3 = creator-side rebuild (dashboard home, discover, my-jobs, wallet, earnings).
-Mobile pass after Slice 3.
+Mobile pass. Will touch:
+  - Sidebars on both project + dashboard (collapse to bottom tab bar < 768px)
+  - PageHeader stacks vertically on mobile
+  - Tables become cards (already done in project-jobs-table)
+  - Long monospace addresses get smart truncation
