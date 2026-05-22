@@ -1,40 +1,34 @@
-// Phase A admin gate. Read-only by design — anyone with a chain explorer
-// can see the same data. The gate is UX, not security. Phase B write
-// actions will need a separate server-only check before any mutation.
-//
-// Environment:
-//   NEXT_PUBLIC_ADMIN_WALLETS = "0xabc...,0xdef..."  (comma-separated)
-//
-// Set this in:
-//   - .env.local         (local dev)
-//   - Vercel Project Env (deployed)
-//
-// Addresses are matched case-insensitively after trimming whitespace.
+"use client";
 
-function parseAdminList(raw: string | undefined): Set<string> {
-  if (!raw) return new Set();
-  return new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter((s) => /^0x[a-f0-9]{40}$/i.test(s))
-  );
+// Client-side admin gate. Reads NEXT_PUBLIC_ADMIN_WALLETS from env (a
+// comma-separated list of lowercased 0x addresses) and reports whether
+// the currently signed-in wallet is allowed to see admin UI.
+//
+// This is UI gating only. The actual write-action API routes also check
+// the user's email against the (non-public) ADMIN_EMAILS env var, so
+// flipping localStorage or DOM doesn't grant real privileges.
+
+import { useAuth } from "@/lib/auth";
+
+function parseAllowed(): string[] {
+  const raw = process.env.NEXT_PUBLIC_ADMIN_WALLETS ?? "";
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.startsWith("0x") && s.length === 42);
 }
 
-/**
- * Read the admin wallet allowlist. Returns a Set of lowercased addresses.
- * Same source works in client + server components because the var is
- * NEXT_PUBLIC_ prefixed.
- */
-export function getAdminWallets(): Set<string> {
-  return parseAdminList(process.env.NEXT_PUBLIC_ADMIN_WALLETS);
-}
-
-/**
- * Check whether a given wallet address is on the admin allowlist.
- */
-export function isAdminWallet(address: string | undefined | null): boolean {
-  if (!address) return false;
-  const wallets = getAdminWallets();
-  return wallets.has(address.toLowerCase());
+export function useIsAdmin(): {
+  ready: boolean;
+  authenticated: boolean;
+  isAdmin: boolean;
+} {
+  const { ready, authenticated, user } = useAuth();
+  if (!ready) return { ready: false, authenticated: false, isAdmin: false };
+  if (!authenticated || !user?.walletAddress) {
+    return { ready: true, authenticated: false, isAdmin: false };
+  }
+  const allowed = parseAllowed();
+  const addr = user.walletAddress.toLowerCase();
+  return { ready: true, authenticated: true, isAdmin: allowed.includes(addr) };
 }

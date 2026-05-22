@@ -1,42 +1,100 @@
-Auth fix v3 - returning user flow
+Admin Phase B + URL scramble
 
-Two bugs that combine to send signed-in users through onboarding every
-time they hit the landing page:
-
-  1. Hero CTAs ("I'm a Creator" / "I'm a Project") always linked to
-     /onboarding, regardless of auth state.
-  2. /onboarding only redirected authenticated users when mode=signin.
-     For signup mode (the default, what the Hero CTAs use), it fast-
-     forwarded them to the Wallet ready step instead of dashboard.
-
-Fixes:
-
-  components/claimr/hero.tsx                REBUILT
-    Detects auth state. When authenticated, swaps the CTAs to
-    "Go to creator dashboard" -> /dashboard/discover
-    "Go to project dashboard" -> /project
-    When signed out, keeps the original creator/project signup CTAs.
-
-  components/claimr/onboarding-cards.tsx    PATCHED
-    The "bounce authenticated user away" effect now fires for any
-    authenticated user, not just mode=signin. Initial step state
-    also no longer fast-forwards to wallet for authenticated visitors.
+Net effect: the entire admin section now lives at /hq/c8m4z2/ instead of
+/admin/, and the job detail page has working manual approve/reject
+buttons that call verifyWork / rejectWork on chain.
 
 
-What returning users will experience after this
+What's in this batch
 
-  Visit /                  Hero shows "Go to creator dashboard" + "Go to project dashboard"
-  Click either             Lands in that dashboard, no detour
-  Visit /onboarding        Bounced immediately to dashboard
-  Visit /onboarding?role=X Bounced to /dashboard or /project
-  Click Launch App         Already auth-aware from earlier batch, goes to dashboard
+  NEW LIBS
+    lib/admin-config.ts          ADMIN_BASE_PATH constant = "/hq/c8m4z2"
+    lib/admin-auth.ts            client-side wallet allowlist (UI gate)
+    lib/admin-auth-server.ts     server-side email check from cookie
+
+  NEW COMPONENT
+    components/claimr/admin-sidebar.tsx
+                                 Management sidebar with links to /hq/c8m4z2/*
+
+  NEW ADMIN PAGES (all under app/hq/c8m4z2/)
+    layout.tsx                   auth gate + sidebar shell
+    page.tsx                     KPI overview - escrow locked, paid out, jobs by status,
+                                 unique project owners and creators, recent jobs
+    jobs/page.tsx                full jobs table with filter + search
+    jobs/[id]/page.tsx           detail page with Phase B Approve/Reject + AI reasoning
+    verifier/page.tsx            queue + recent decisions
+    activity/page.tsx            full verifier activity feed, polls every 8s
+
+  NEW API ROUTES (Phase B writes)
+    app/api/admin/jobs/[id]/approve/route.ts
+                                 calls verifyWork(id) on chain via VERIFIER_PRIVATE_KEY
+    app/api/admin/jobs/[id]/reject/route.ts
+                                 calls rejectWork(id, reason)
+    app/api/admin/activity/route.ts
+                                 reads verification-log Map
+
+
+Two env vars to set in Vercel
+
+  NEXT_PUBLIC_ADMIN_WALLETS   client-side: comma-separated lowercased 0x addresses
+                              that should see the management UI. UI-only gating.
+
+  ADMIN_EMAILS                server-side: comma-separated lowercased emails that
+                              are allowed to call the approve/reject/activity APIs.
+                              THIS is the real gate. Even if someone DOM-hacks past
+                              the UI, the API rejects them without an allowed email.
+
+Set both to your wallet + signup email. Get your wallet from the wallet
+card on /project or /dashboard/wallet.
+
+If you already have VERIFIER_PRIVATE_KEY set (for the AI verifier), that
+same key signs the manual approve/reject. No new key needed.
+
+
+URL obscurity
+
+The slug "/hq/c8m4z2" is hardcoded as a folder name AND in lib/admin-config.ts.
+If you want to rotate it, you have to:
+  1. Rename the folder app/hq/c8m4z2 to app/hq/<new-slug>
+  2. Update ADMIN_BASE_PATH in lib/admin-config.ts to match
+The sidebar and layout pick up the constant automatically.
+
+
+Test path after deploy
+
+  /hq/c8m4z2                  KPI overview (you should see live numbers from chain)
+  /hq/c8m4z2/jobs             jobs table
+  /hq/c8m4z2/jobs/{any id}    detail page
+                              If status is 2 (Submitted), Approve/Reject panel
+                              renders below. Approve calls verifyWork(id) and
+                              shows the tx hash. Reject requires a reason and
+                              calls rejectWork(id, reason).
+  /hq/c8m4z2/verifier         queue (status 2 jobs) + session decisions
+  /hq/c8m4z2/activity         full session activity feed
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-auth-fix-v3.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-auth-fix-v3.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-auth-fix-3.js
+  Move-Item C:\Users\Bright\Downloads\claimr-admin-phase-b.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-admin-phase-b.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; git status
   git add -A
-  git commit -m "auth: bounce returning users to dashboard from landing + onboarding"
+  git commit -m "admin: phase B writes (manual approve/reject) + URL scramble to /hq/c8m4z2"
   git push https://iam25th1@github.com/iam25th1/claimr.git
+
+
+After Vercel rebuild
+
+  - Set NEXT_PUBLIC_ADMIN_WALLETS and ADMIN_EMAILS in Vercel env vars
+  - Trigger a redeploy (Vercel does this automatically when env vars change,
+    or you can hit Redeploy on the latest deployment)
+  - Visit /hq/c8m4z2 - should land on the management overview
+
+
+Not in this batch (next admin items if you want them)
+
+  - Verifier prompt editor (requires changes to app/api/verify/route.ts
+    to read prompt from a store instead of hardcoded constant)
+  - Banned wallets management (off-chain blocklist)
+  - Vercel KV for persistent verification log (replaces in-memory Map)
+  - Refund stuck escrow (would need a new contract function)
