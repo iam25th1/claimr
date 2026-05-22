@@ -94,7 +94,7 @@ export default function ProjectSettingsPage() {
             <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
               <div>
                 <p className="font-mono text-sm text-foreground">0xa84...64626</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Arc Testnet • Connected via MetaMask</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Arc Testnet • Embedded wallet by Circle</p>
               </div>
               <a
                 href="https://testnet.arcscan.app/address/0xa8404ecf7e163821da0363E78E4Fb4d6E1164626"
