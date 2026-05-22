@@ -1,79 +1,50 @@
-Auth fix and sign-in/sign-up split
+Auth fix v2 - widen "already initialized" catch
 
-Three things in this batch.
+What's in your error log: "Could not start PIN challenge: The user had
+already been initialized." That's Circle rejecting the createUserPinWithWallets
+call because the user's PIN and wallet are both already set up. My
+previous catch only checked numeric error codes (155206, 155709) and
+Circle returned a different code for this case.
 
-1. Diagnose and fix the 500 on signup
+This patch broadens the detection to also match the error message text,
+which is more reliable across Circle's various endpoint variants.
 
-   Most likely cause: CIRCLE_API_KEY missing in Vercel env vars. Step one
-   is verify in Vercel dashboard - Settings - Environment Variables that
-   both CIRCLE_API_KEY and NEXT_PUBLIC_CIRCLE_APP_ID are set on all
-   environments (Production, Preview, Development).
+Patterns now caught:
+  - code 155206 (pinAlreadySet)
+  - code 155207 (userInitialized)
+  - code 155709 (walletAlreadyExists)
+  - any message containing "already initialized" / "already been initialized"
+  - any message containing "already set" / "already exists"
+  - any message containing "wallet already"
 
-   The onboard route now also detects this case directly and returns
-   "CIRCLE_API_KEY is not set in Vercel env vars" instead of "Internal
-   onboarding error", so the UI shows the real reason on the screen.
+When isAlreadyInit fires, the route returns alreadyInitialized=true and
+the client (providers.tsx, already shipped in the previous batch) skips
+the PIN sheet and goes straight to finalize, which looks up the existing
+wallet for that email and sets the session cookie.
 
-2. Real bug fix in the auth flow
-
-   When an existing user tries to sign in via the same flow, Circle does
-   not return a challengeId (PIN already exists). The old code called
-   executeChallenge(null) which threw, surfacing as a generic error to
-   the user. Now:
-     - The onboard route returns alreadyInitialized=true in that case
-     - providers.tsx skips executeChallenge when alreadyInitialized is set
-     - Goes straight to finalize, which looks up the existing wallet
-
-   Also handles Circle error codes 155206 (pinAlreadySet) and 155709
-   (walletAlreadyExists) as "already initialized" cases.
-
-3. Sign in vs sign up split
-
-   /onboarding now reads ?mode= from the URL:
-     mode=signup (default)   full flow: role -> email -> verify -> wallet -> profile
-     mode=signin             short flow: email -> verify -> redirect
-
-   Visible mode toggle at the top of /onboarding lets the user switch.
-
-   Routing changes:
-     - Navbar "Sign in" (signed-out state)  -> /onboarding?mode=signin
-     - Landing hero "I'm a Creator"         -> /onboarding?role=creator&mode=signup
-     - Landing hero "I'm a Project"         -> /onboarding?role=project&mode=signup
-
-   The sign-in flow skips the role picker, wallet-ready, and profile steps
-   since returning users already have all of those. Just email, OTP, in.
-
-
-Files
-
-  REBUILT (zip overwrites)
-    app/providers.tsx                          AuthProvider with the bug fix
-    app/api/circle/onboard/route.ts            env-aware error surfacing + alreadyInitialized
-    components/claimr/onboarding-cards.tsx     dual mode signup/signin
-
-  SURGICAL PATCHES (apply-auth-fix.js)
-    components/claimr/navbar.tsx               Sign in -> ?mode=signin
-    components/claimr/hero.tsx                 CTAs -> ?role=X&mode=signup
+Net effect: returning users sign in without seeing this error. The first-
+time PIN sheet still fires for genuinely new users.
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-auth-fix.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-auth-fix.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-auth-fix.js
+  Move-Item C:\Users\Bright\Downloads\claimr-auth-fix-v2.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-auth-fix-v2.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-auth-fix-2.js
   git add -A
-  git commit -m "auth: fix returning-user signin bug, split signin/signup modes, better error surfaces"
+  git commit -m "auth: widen already-initialized detection in onboard route"
   git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-If you still see 500 after this
+After this deploys, try signing in again with the same email. You should
+see the wallet step appear instead of the error toast.
 
-  Open Vercel project Settings -> Environment Variables. Confirm:
-    CIRCLE_API_KEY           set on Production, Preview, Development
-    NEXT_PUBLIC_CIRCLE_APP_ID  set on Production, Preview, Development
 
-  If they're missing, get them from app.circle.com (Developer console,
-  Programmable Wallets, your application). Paste in Vercel, redeploy.
+If you see a NEW error after this
 
-  If the keys are set and you still see 500, open the Vercel deployment,
-  Functions tab, find /api/circle/onboard, click into the latest invocation,
-  read the logged error. Paste it to me and we'll handle that specifically.
+Most likely candidates:
+  1. Finalize fails because the wallet lookup takes a beat to propagate
+     after createUser. The route returns 503 "Wallet not yet provisioned,
+     retry shortly" in that case. Refresh and try again.
+  2. Some other Circle error. The new error surface includes the actual
+     message now, so paste it to me and we'll handle that one too.

@@ -90,9 +90,22 @@ export async function POST(req: NextRequest) {
       // Treat as already-initialized so the client can skip the PIN sheet
       // and go straight to finalize (which looks up the existing wallet).
       const code = err?.response?.data?.code ?? err?.code;
-      // 155206 (pinAlreadySet) / 155709 (walletAlreadyExists). Treat any
-      // existing-state error as "we're good, skip the challenge".
-      if (code === 155206 || code === 155709) {
+      const msg = String(
+        err?.response?.data?.message ?? err?.message ?? ""
+      ).toLowerCase();
+      // Numeric codes 155206 / 155207 / 155709 cover the documented cases,
+      // and a message-text fallback catches any variant Circle adds later.
+      // Patterns: "already initialized", "already been initialized",
+      // "already set", "already exists", "wallet already".
+      const isAlreadyInit =
+        code === 155206 ||
+        code === 155207 ||
+        code === 155709 ||
+        /already (been )?init/.test(msg) ||
+        /already (been )?set/.test(msg) ||
+        /already exist/.test(msg) ||
+        /wallet already/.test(msg);
+      if (isAlreadyInit) {
         alreadyInitialized = true;
       } else {
         console.error("[CIRCLE/onboard] createUserPinWithWallets failed", err);
