@@ -5,16 +5,11 @@ import { Lock, TrendingUp, CheckCircle2, ExternalLink, Loader2 } from "lucide-re
 import { useJobs } from "@/lib/useJobs";
 import { CLAIMR_ESCROW_ADDRESS } from "@/lib/contracts";
 import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
-
-// Map contract status enum (0-5) to display info
-const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: "Open", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
-  1: { label: "Claimed", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
-  2: { label: "Pending Release", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" },
-  3: { label: "Released", color: "bg-green-500/10 text-green-400 border-green-500/30" },
-  4: { label: "Cancelled", color: "bg-gray-500/10 text-gray-400 border-gray-500/30" },
-  5: { label: "Failed", color: "bg-red-500/10 text-red-400 border-red-500/30" },
-};
+import { motion, AnimatePresence } from "motion/react";
+import { AnimatedNumber } from "@/components/primitives/animated-number";
+import { StatePill } from "@/components/primitives/state-pill";
+import { EscrowPayoutFlight } from "@/components/claimr/escrow-payout-flight";
+import { motionDurations, motionEase } from "@/lib/motion";
 
 export default function EscrowPage() {
   const { jobs, isLoading } = useJobs();
@@ -64,7 +59,7 @@ export default function EscrowPage() {
                 Currently Locked
               </div>
               <p className="mt-2 text-3xl font-bold text-foreground">
-                {totalLocked} <span className="text-base font-normal text-muted-foreground">USDC</span>
+                <AnimatedNumber value={totalLocked} /> <span className="text-base font-normal text-muted-foreground">USDC</span>
               </p>
             </div>
 
@@ -74,7 +69,7 @@ export default function EscrowPage() {
                 Pending Release
               </div>
               <p className="mt-2 text-3xl font-bold text-foreground">
-                {pendingRelease} <span className="text-base font-normal text-muted-foreground">USDC</span>
+                <AnimatedNumber value={pendingRelease} /> <span className="text-base font-normal text-muted-foreground">USDC</span>
               </p>
             </div>
 
@@ -84,7 +79,7 @@ export default function EscrowPage() {
                 Total Released
               </div>
               <p className="mt-2 text-3xl font-bold text-foreground">
-                {totalReleased} <span className="text-base font-normal text-muted-foreground">USDC</span>
+                <AnimatedNumber value={totalReleased} /> <span className="text-base font-normal text-muted-foreground">USDC</span>
               </p>
             </div>
           </div>
@@ -128,14 +123,23 @@ export default function EscrowPage() {
               </div>
             ) : (
               <div className="divide-y divide-white/5">
+                <AnimatePresence initial={false}>
                 {jobs.map((job) => {
-                  const status = statusMap[job.status];
                   const creatorDisplay = job.creator === "0x0000000000000000000000000000000000000000"
                     ? "Unclaimed"
                     : `${job.creator.slice(0, 6)}...${job.creator.slice(-4)}`;
 
                   return (
-                    <div key={job.id} className="flex flex-wrap items-center justify-between gap-4 p-5">
+                    <motion.div
+                      key={job.id}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: motionDurations.base, ease: motionEase.out }}
+                      className="relative flex flex-wrap items-center justify-between gap-4 p-5"
+                    >
+                      <EscrowPayoutFlight jobId={job.id} status={job.status} amount={job.amount} />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-foreground">{job.title}</h3>
                         <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
@@ -146,13 +150,12 @@ export default function EscrowPage() {
                         <span className="font-semibold text-foreground">
                           {job.amount} <span className="text-sm text-muted-foreground">USDC</span>
                         </span>
-                        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.color}`}>
-                          {status.label}
-                        </span>
+                        <StatePill state={job.status} />
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
+                </AnimatePresence>
               </div>
             )}
           </div>

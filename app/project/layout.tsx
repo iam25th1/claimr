@@ -1,4 +1,5 @@
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
+import { LivingBackground } from "@/components/primitives/living-background";
 
 export default function ProjectLayout({
   children,
@@ -7,11 +8,8 @@ export default function ProjectLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      {/* Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -right-32 h-96 w-96 rounded-full bg-[#2D6EFF]/5 blur-3xl" />
-        <div className="absolute bottom-1/4 -left-32 h-96 w-96 rounded-full bg-[#FF2D7A]/5 blur-3xl" />
-      </div>
+      {/* Living gradient field - WebGL shader, brand-colored, pauses when tab hidden */}
+      <LivingBackground />
 
       <ProjectSidebar />
 

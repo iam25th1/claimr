@@ -7,11 +7,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  // TODO: remove ignoreBuildErrors once any latent TS errors are fixed. Masking
-  // build-time type errors can hide security-relevant issues from shipping.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // type errors are enforced at build time (no ignoreBuildErrors)
   images: {
     unoptimized: true,
   },

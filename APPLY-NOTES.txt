@@ -1,72 +1,87 @@
-Motion wiring patch — Batch 1 retrofit
-=======================================
+Finish batch - escrow payout animation + LivingBackground + drop build mask
+=============================================================================
 
-What this does
---------------
-Wires the Batch 0 primitives (AnimatedNumber, StatePill) into the four
-dashboard surfaces that decide demo impact:
+What this ships
+---------------
 
-  components/claimr/hero-escrow-number.tsx
-    - container now breathes (subtle 3.6s scale loop, 0.6% amplitude)
-    - escrow total counts up smoothly via AnimatedNumber
+NEW FILE:
+  components/claimr/escrow-payout-flight.tsx   the USDC fly-to-creator overlay
 
-  components/claimr/project-job-cards.tsx
-    - StatePill replaces the inline status span
-    - cards now layout-animate (slide in/out, reflow on status change)
-    - drops the now-unused STATUS_LABELS + STATUS_STYLES tables
+PATCHES:
+  app/project/escrow/page.tsx
+    - 3 stat counters animate via AnimatedNumber
+    - StatePill replaces inline status spans
+    - rows layout-animate in/out of an AnimatePresence
+    - EscrowPayoutFlight overlay on each row, fires on status 2 -> 3
 
-  app/project/jobs/page.tsx
-    - StatePill replaces the inline status span
-    - cards layout-animate inside an AnimatePresence
+  app/project/layout.tsx
+  app/dashboard/layout.tsx
+    - static blur-blob divs replaced with <LivingBackground />
 
-  components/claimr/my-jobs-list.tsx
-    - StatePill (size sm) added next to each job title
-    - cards layout-animate inside an AnimatePresence
+  next.config.mjs
+    - ignoreBuildErrors: true removed
+    - project already type-checks clean under strict mode (verified before
+      this patch was authored)
 
-Order-independent with the previous empty-states patch (claimr-batch-4.zip).
-Can be applied before or after. Verified both orderings produce the same
-final state and type-check clean.
+Idempotent. Self-deletes on success. Stays in place on failure for
+inspection.
 
 
 Apply
 -----
 
 1. Zip lands at:
-   C:\Users\Bright\Documents\GitHub\claimr-motion-wiring.zip
+   C:\Users\Bright\Documents\GitHub\claimr-finish.zip
 
-2. Extract into the repo (just the apply script, no new source files):
+2. Extract over the repo (one new source file + the apply script):
 
-   cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-motion-wiring.zip -DestinationPath claimr
+   cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-finish.zip -DestinationPath claimr
 
-   If git status is clean after, use File Explorer extract instead.
+   If git status shows nothing after, use File Explorer extract instead.
 
-3. Run from the repo root:
+3. Apply patches from the repo root:
 
-   cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-motion-wiring.js
+   cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-finish.js
 
-   Script self-deletes on success. Idempotent on re-run.
 
-4. Verify in dev:
+Full local test
+---------------
+
+   npm run build
+
+   Should succeed without the ignoreBuildErrors safety net. If a type error
+   surfaces, it was already there and previously hidden. Paste it and we
+   fix it.
 
    npm run dev
 
-   /project           hero number breathes, counts up on first paint,
-                      counts again when you post or pay out a job
-   /project/jobs      StatePill on each row, smooth entrance, reflow when
-                      filter changes
-   /dashboard/my-jobs StatePill appears next to title in each tab
+   - / and /project           LivingBackground field is rendering. Move
+                              the cursor, the field shifts slightly.
+                              Switch tabs and back, animation pauses then
+                              resumes.
 
-5. Commit + push:
+   - /project                 escrow hero number breathes (3.6s scale
+                              loop) and counts up on first paint.
 
-   git add -A ; git commit -m "batch 1 retrofit: wire AnimatedNumber + StatePill into dashboard surfaces" ; git push https://iam25th1@github.com/iam25th1/claimr.git
+   - /project/escrow          three stat counters animate. Rows have
+                              StatePill. To test the payout flight
+                              without a real chain event, open devtools
+                              console and dispatch:
+
+                              window.dispatchEvent(new CustomEvent('claimr:replay-payout', { detail: { jobId: 1 } }))
+
+                              (replace 1 with an actual job id). A +X USDC
+                              coin flies from the right side of that row
+                              to the left, with a green ripple landing at
+                              the creator side.
+
+   - /project/jobs            StatePill on each card, smooth row entrance
+   - /dashboard               LivingBackground rendering, all motion
+                              wiring from the earlier batch active
+   - /dashboard/my-jobs       StatePill near each title
 
 
-What this does NOT do
----------------------
+Commit + push
+-------------
 
-- /project/escrow USDC fly-to-creator animation. That's the bigger Batch 1
-  moment piece and gets its own batch.
-- Living background. The primitive exists but the call to wire it into
-  /project is deferred until we've seen how the dashboard feels with the
-  number breathing and the cards animating. May not need it.
-- Drop ignoreBuildErrors: true from next.config.mjs. Still open.
+   cd C:\Users\Bright\Documents\GitHub\claimr ; git add -A ; git commit -m "batch 1 finish: payout flight, living background, strict build" ; git push https://iam25th1@github.com/iam25th1/claimr.git
