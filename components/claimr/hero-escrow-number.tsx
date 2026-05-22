@@ -5,8 +5,9 @@ import { useAuth } from "@/lib/auth";
 import { Lock } from "lucide-react";
 
 // Big gradient-filled hero showing total USDC currently locked in escrow
-// across this project's active (open or claimed) jobs. The visual moment
-// of the project dashboard.
+// across this project's active jobs (Open, Claimed, or Submitted).
+// Matches ProjectStats' definition of "escrowed" — funds still held by
+// the contract, not yet released to creator or refunded.
 
 export function HeroEscrowNumber() {
   const { user } = useAuth();
@@ -17,8 +18,12 @@ export function HeroEscrowNumber() {
     ? jobs.filter((j) => j.project.toLowerCase() === address.toLowerCase())
     : [];
 
-  // Status 0 = Open, 1 = Claimed. Both still have USDC locked.
-  const activeJobs = myJobs.filter((j) => j.status === 0 || j.status === 1);
+  // Status 0=Open, 1=Claimed, 2=Submitted. All three still have USDC
+  // held by the escrow contract. Status 3=Verified means released,
+  // 5=Cancelled means refunded.
+  const activeJobs = myJobs.filter(
+    (j) => j.status === 0 || j.status === 1 || j.status === 2
+  );
   const totalLocked = activeJobs.reduce((sum, j) => sum + j.amount, 0);
 
   return (
