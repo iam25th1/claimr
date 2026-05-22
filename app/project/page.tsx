@@ -2,6 +2,8 @@ import { ProjectStats } from "@/components/claimr/project-stats";
 import { ProjectJobCards } from "@/components/claimr/project-job-cards";
 import { PostJobCTA } from "@/components/claimr/post-job-cta";
 import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
+import { HeroEscrowNumber } from "@/components/claimr/hero-escrow-number";
+import { RecentActivity } from "@/components/claimr/recent-activity";
 
 export default function ProjectDashboard() {
   return (
@@ -14,11 +16,17 @@ export default function ProjectDashboard() {
         </p>
       </div>
 
+      {/* Hero: total locked in escrow */}
+      <HeroEscrowNumber />
+
       {/* Wallet address + funding moment */}
       <WalletAddressCard />
 
       {/* Stats */}
       <ProjectStats />
+
+      {/* Recent activity */}
+      <RecentActivity />
 
       {/* Active Jobs */}
       <div>
