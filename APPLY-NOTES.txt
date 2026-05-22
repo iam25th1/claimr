@@ -1,114 +1,57 @@
-Flow rescue batch
-==================
+Slice 1 of 3 — Onboarding rebuild
 
-What this fixes (from the live audit, in priority order)
+Just two files. No apply script needed, drop-in replacement.
 
-  1. Content centering. Project + dashboard layouts now wrap children in
-     max-w-6xl mx-auto. Forms (settings) explicitly narrower at max-w-2xl
-     inside the wrapper.
-
-  2. Double-sidebar bug. /project/post, /project/jobs, /project/escrow,
-     and /project/analytics each rendered ProjectSidebar + their own
-     <main className="ml-64"> wrapper on TOP of the layout's. Content was
-     pushed 128px off-center. Each sub-page now returns just its content.
-
-  3. WalletAddressCard shows live USDC balance. Visible everywhere the
-     card lives: /project, /dashboard/wallet, /project/escrow. Funded
-     users finally see the result.
-
-  4. Sidebars stop lying. "Connected" replaced with "Sign in" when no
-     auth. Both creator-side and project-side fixed.
-
-  5. /project/settings rebuilt. Real form: name, tagline, website, X
-     handle, description. Saves to localStorage keyed by wallet. The
-     ArcSwap/team@arcswap hardcoded mock is gone.
-
-  6. /dashboard/settings rebuilt. Real form: display name, X handle,
-     bio, payout address, notification toggles. The jenzy.eth / Turnkey
-     mock is gone. (Turnkey reference was wrong - wallet is Circle.)
-
-  7. Navbar "Launch App" routes based on auth state. Signed in goes to
-     /dashboard/discover. Signed out gets sent to /onboarding?role=creator
-     and the button label reads "Sign in" instead.
-
-  8. Onboarding has a "we create a wallet for you, no MetaMask needed"
-     callout below the subheading.
-
-  9. Em dash scrub on user-facing strings (my-jobs-list pending text).
+  components/claimr/onboarding-cards.tsx   rebuilt (same export, same import path)
+  lib/profile-store.ts                     included for safety in case the
+                                           flow-fix batch wasn't applied yet
+                                           (identical to the one in flow-fix)
 
 
-Files
+What's different
 
-  NEW
-    lib/profile-store.ts                       Profile read/write helpers
+Old onboarding: one screen, email input, immediate router.replace to
+dashboard. No funding step, no profile step, no progress indicator.
 
-  REBUILT (zip overwrites the files)
-    app/project/settings/page.tsx
-    components/claimr/settings-content.tsx
+New onboarding: real 4-or-5 step flow with progress dots at top:
 
-  SURGICAL PATCHES (apply-flow-fix.js)
-    app/dashboard/layout.tsx
-    app/project/layout.tsx
-    app/project/post/page.tsx
-    app/project/jobs/page.tsx
-    app/project/escrow/page.tsx
-    app/project/analytics/page.tsx
-    components/claimr/dashboard-sidebar.tsx
-    components/claimr/project-sidebar.tsx
-    components/claimr/navbar.tsx
-    components/claimr/wallet-address-card.tsx
-    components/claimr/onboarding-cards.tsx
-    components/claimr/my-jobs-list.tsx
+  1. Role pick (only shown when ?role= isn't in URL)
+     Two cards side by side. Tap one, advances.
+
+  2. Email entry
+     With a Circle-wallet explainer callout, "no MetaMask" message.
+     Submits via signUp(), advances to verifying.
+
+  3. Verifying
+     Spinner + rotating messages while Circle handles OTP and wallet
+     provisioning. Auto-advances when user.walletAddress lands.
+
+  4. Wallet ready
+     Shows the new wallet address with copy button + Arcscan link.
+     Shows USDC balance, live, refetching every 5 seconds so a faucet
+     drop lands visibly. Fund Wallet button opens existing modal.
+     Continue button to advance, with copy that adapts to funded state.
+
+  5. Profile (optional, skippable)
+     Name + X handle + bio. Saves to localStorage profile store.
+     Skip and they go straight to dashboard.
+
+Hero CTAs on landing already pass ?role=creator or ?role=project, so
+the role step is skipped for users coming from those links. Anyone
+hitting /onboarding without a role param sees the role picker first.
+
 
 Apply
 
-  1. Zip lands at:
-       C:\Users\Bright\Documents\GitHub\claimr-flow-fix.zip
-
-  2. Extract:
-       cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-flow-fix.zip -DestinationPath claimr
-
-     If git status is clean after, use File Explorer extract instead.
-
-  3. Apply patches:
-       cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-flow-fix.js
-
-  4. Verify:
-       npm run build      # strict TS, should still pass
-       npm run dev
-
-Test list (in browser, signed in as a project)
-
-  /                  Launch App button label reads correctly per auth
-  /onboarding?role=creator    has the "no MetaMask" callout block
-  /project           hero number visible, WalletAddressCard shows USDC
-  /project/jobs      content centered, no double sidebar offset
-  /project/escrow    content centered, stat counters + payout flight live
-  /project/post      form centered, ErrorCallout still wired
-  /project/analytics content centered
-  /project/settings  real form, fill in name + X handle, click Save,
-                     reload page, values persist
-  /dashboard         content centered
-  /dashboard/my-jobs content centered, no off-right offset
-  /dashboard/settings real form (display name + X + bio + payout),
-                     no jenzy / Turnkey hardcoded data
-
-Sign out, hit /project sidebar - should read "Sign in" at the bottom
-instead of "Connected".
-
-
-What's NOT in this batch
-
-  - X OAuth (manual @handle input only, OAuth is a separate batch with
-    Twitter Dev app setup)
-  - Cross-device profile sync (localStorage only; Vercel KV swap later)
-  - Notification delivery wiring (preferences saved, no email/push yet)
-  - Onboarding rebuild beyond the MetaMask callout
-  - Mobile responsive pass
-
-Commit and push
-
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice1-onboarding.zip -DestinationPath claimr
   cd C:\Users\Bright\Documents\GitHub\claimr
   git add -A
-  git commit -m "flow rescue: centering, balance visibility, real settings, sidebar fix, onboarding callout"
+  git commit -m "slice 1: onboarding rebuilt (stepper, wallet provisioning state, fund step, optional profile)"
   git push https://iam25th1@github.com/iam25th1/claimr.git
+
+
+Next
+
+Slice 2 = project owner experience (overview, post, jobs, escrow, analytics) all rebuilt to the same standard.
+Slice 3 = creator experience (dashboard, discover, my-jobs, wallet, earnings).
+Mobile pass after Slice 3.
