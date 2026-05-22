@@ -4,6 +4,7 @@ import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { Lock, TrendingUp, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useJobs } from "@/lib/useJobs";
 import { CLAIMR_ESCROW_ADDRESS } from "@/lib/contracts";
+import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
 
 // Map contract status enum (0-5) to display info
 const statusMap: Record<number, { label: string; color: string }> = {
@@ -22,11 +23,11 @@ export default function EscrowPage() {
   const totalLocked = jobs
     .filter(j => j.status === 0 || j.status === 1) // Open or Claimed
     .reduce((sum, j) => sum + j.amount, 0);
-  
+
   const pendingRelease = jobs
     .filter(j => j.status === 2) // Submitted
     .reduce((sum, j) => sum + j.amount, 0);
-  
+
   const totalReleased = jobs
     .filter(j => j.status === 3) // Completed
     .reduce((sum, j) => sum + j.amount, 0);
@@ -34,7 +35,7 @@ export default function EscrowPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <ProjectSidebar />
-      
+
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8 flex items-start justify-between gap-4">
@@ -48,6 +49,11 @@ export default function EscrowPage() {
               <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
               Live on-chain
             </div>
+          </div>
+
+          {/* Wallet address + funding moment */}
+          <div className="mb-8">
+            <WalletAddressCard />
           </div>
 
           {/* Stats */}
@@ -109,7 +115,7 @@ export default function EscrowPage() {
             <div className="border-b border-white/10 p-4">
               <h2 className="font-semibold text-foreground">Escrow Activity</h2>
             </div>
-            
+
             {isLoading ? (
               <div className="p-12 text-center">
                 <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
@@ -127,7 +133,7 @@ export default function EscrowPage() {
                   const creatorDisplay = job.creator === "0x0000000000000000000000000000000000000000"
                     ? "Unclaimed"
                     : `${job.creator.slice(0, 6)}...${job.creator.slice(-4)}`;
-                  
+
                   return (
                     <div key={job.id} className="flex flex-wrap items-center justify-between gap-4 p-5">
                       <div className="flex-1 min-w-0">

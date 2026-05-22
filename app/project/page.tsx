@@ -1,6 +1,7 @@
 import { ProjectStats } from "@/components/claimr/project-stats";
 import { ProjectJobCards } from "@/components/claimr/project-job-cards";
 import { PostJobCTA } from "@/components/claimr/post-job-cta";
+import { WalletAddressCard } from "@/components/claimr/wallet-address-card";
 
 export default function ProjectDashboard() {
   return (
@@ -12,6 +13,9 @@ export default function ProjectDashboard() {
           Manage your jobs and track creator performance
         </p>
       </div>
+
+      {/* Wallet address + funding moment */}
+      <WalletAddressCard />
 
       {/* Stats */}
       <ProjectStats />

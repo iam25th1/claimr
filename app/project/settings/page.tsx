@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { ProjectSidebar } from "@/components/claimr/project-sidebar";
 import { BadgeCheck, Wallet, Bell, ExternalLink } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export default function ProjectSettingsPage() {
+  const { user } = useAuth();
+  const address = user?.walletAddress;
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Loading...";
+
   const [companyName, setCompanyName] = useState("ArcSwap Protocol");
   const [email, setEmail] = useState("team@arcswap.io");
   const [website, setWebsite] = useState("https://arcswap.io");
@@ -13,7 +18,7 @@ export default function ProjectSettingsPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <ProjectSidebar />
-      
+
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
@@ -24,7 +29,7 @@ export default function ProjectSettingsPage() {
           {/* Company Profile */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
             <h2 className="mb-4 font-semibold text-foreground">Company Profile</h2>
-            
+
             <div className="mb-4 flex items-center gap-4">
               <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#2D6EFF] to-[#FF2D7A] p-[2px]">
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-background text-lg font-bold text-foreground">
@@ -84,27 +89,29 @@ export default function ProjectSettingsPage() {
             </div>
           </div>
 
-          {/* Connected Wallet */}
+          {/* Your Claimr Wallet */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
             <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">
               <Wallet className="h-5 w-5 text-[#2D6EFF]" />
-              Connected Wallet
+              Your Claimr wallet
             </h2>
-            
+
             <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
               <div>
-                <p className="font-mono text-sm text-foreground">0xa84...64626</p>
+                <p className="font-mono text-sm text-foreground">{shortAddr}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">Arc Testnet • Embedded wallet by Circle</p>
               </div>
-              <a
-                href="https://testnet.arcscan.app/address/0xa8404ecf7e163821da0363E78E4Fb4d6E1164626"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm text-[#2D6EFF] hover:text-[#2D6EFF]/80 transition-colors"
-              >
-                View on Arcscan
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              {address && (
+                <a
+                  href={`https://testnet.arcscan.app/address/${address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-[#2D6EFF] hover:text-[#2D6EFF]/80 transition-colors"
+                >
+                  View on Arcscan
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -114,7 +121,7 @@ export default function ProjectSettingsPage() {
               <Bell className="h-5 w-5 text-[#FF2D7A]" />
               Notifications
             </h2>
-            
+
             <div className="space-y-3">
               {[
                 { label: "New job applicants", desc: "When creators apply to your jobs" },
