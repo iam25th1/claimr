@@ -1,78 +1,50 @@
-Slice 3 of 3 - Creator experience
+Mobile polish
 
-Six files. All drop-in replacements. No apply script.
+Quick note: the main mobile pass is already in your repo. Both layouts
+use a shared MobileTabBar (bottom tabs + overflow More sheet with sign
+out), sidebars are hidden md:flex, safe-area inset handled, animated
+sheet via motion. Good work already shipped.
 
-  REBUILT (zip overwrites)
-    app/dashboard/page.tsx                  home overview composition
-    app/dashboard/discover/page.tsx         job discovery composition
-    app/dashboard/my-jobs/page.tsx          my-jobs composition
-    app/dashboard/wallet/page.tsx           wallet composition
-    app/dashboard/earnings/page.tsx         earnings composition
-    components/claimr/earnings-chart.tsx    real chain data (was hardcoded)
+What this small zip fixes are the two surfaces that still felt cramped
+on phones after that work:
 
+  components/claimr/wallet-address-card.tsx
+    The 3 buttons (Copy, Arcscan, Fund wallet) now stack vertically
+    full-width on phones, side-by-side on sm+. Each button gets its own
+    row on mobile so they're tap-sized.
 
-What changed and why
+  components/claimr/page-header.tsx
+    Title block + action button were using flex-wrap which made the
+    action button drift awkwardly on narrow widths. Now properly stacks
+    vertically on mobile (title -> action below, full-width), side-by-
+    side on sm+. The compound selectors on the action wrapper force any
+    Link or button child to fill the row and center its content.
 
-/dashboard (home)
-  - PageHeader with "Welcome back, [name]" reading email or short wallet
-  - At a glance section heading above existing StatsCards
-  - Featured and Latest job sections each with "See all" -> discover
-  - No new components, just proper hierarchy and section headers
+Apply (drop-in, no script)
 
-/dashboard/discover
-  - PageHeader, then the existing DiscoverFeed (search + featured + latest)
-  - Discover internals unchanged. They already pull real data via useJobs.
-
-/dashboard/my-jobs
-  - PageHeader with new copy
-  - MyJobsList unchanged - already had StatePill, EmptyState, motion from
-    earlier batches
-
-/dashboard/wallet
-  - Sectioned: Address -> Balances -> Recent transactions -> Swap
-  - Replaces the old WalletHeader (which had its own h1) with the unified
-    PageHeader
-  - All child components unchanged
-
-/dashboard/earnings
-  - Sectioned: At a glance -> Monthly earnings -> Payment history
-  - EarningsChart is rebuilt entirely. Was hardcoded monthlyData =
-    [{month: "Dec", amount: 120}, ...]. Now reads real completed-job
-    payouts grouped by month, last 6 months, with animated bar growth
-    and an empty state for new creators.
-
-
-Dependencies
-
-  Requires components/claimr/page-header.tsx (added in Slice 2).
-  If Slice 2 wasn't pushed, run:
-    Move-Item C:\Users\Bright\Downloads\claimr-slice2-project.zip C:\Users\Bright\Documents\GitHub\
-    cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice2-project.zip -DestinationPath claimr
-  first.
-
-
-Apply
-
-  Move-Item C:\Users\Bright\Downloads\claimr-slice3-creator.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-slice3-creator.zip -DestinationPath claimr
+  Move-Item C:\Users\Bright\Downloads\claimr-mobile-polish.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-mobile-polish.zip -DestinationPath claimr
   cd C:\Users\Bright\Documents\GitHub\claimr ; git status
 
-  Should list:
-    modified:   app/dashboard/page.tsx
-    modified:   app/dashboard/discover/page.tsx
-    modified:   app/dashboard/my-jobs/page.tsx
-    modified:   app/dashboard/wallet/page.tsx
-    modified:   app/dashboard/earnings/page.tsx
-    modified:   components/claimr/earnings-chart.tsx
+Should list 2 modified files.
 
-  Commit and push:
-    git add -A ; git commit -m "slice 3: creator experience (home, discover, my-jobs, wallet, earnings)" ; git push https://iam25th1@github.com/iam25th1/claimr.git
+  git add -A ; git commit -m "mobile polish: wallet address card buttons stack, page header action full-width" ; git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Next
+Where things stand
 
-Mobile pass. Will touch:
-  - Sidebars on both project + dashboard (collapse to bottom tab bar < 768px)
-  - PageHeader stacks vertically on mobile
-  - Tables become cards (already done in project-jobs-table)
-  - Long monospace addresses get smart truncation
+Done across the rebuild:
+  - Slice 1: onboarding stepper (role + email + verifying + wallet + profile)
+  - Slice 2: project owner experience (overview, post stepper, jobs table)
+  - Slice 3: creator experience (home, discover, my-jobs, wallet, earnings)
+  - Mobile: bottom tab bar + responsive layouts (was already done)
+  - Mobile polish: this batch
+
+Still parked for later (your call when):
+  - X (Twitter) OAuth real connection. Currently manual @handle entry.
+    Needs a Twitter Developer app + env keys + /api/auth/x/{login,callback}
+    routes. Half-day of work + setup on your end.
+  - Cross-device profile sync via Vercel KV (currently localStorage)
+  - Notification delivery (preferences saved, no email/push wired)
+  - Phase B admin writes (manual approve/reject, refund, prompt edit,
+    pause, ban, persisted reasoning via KV)

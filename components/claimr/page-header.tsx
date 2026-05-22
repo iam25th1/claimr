@@ -22,7 +22,7 @@ interface Props {
 
 export function PageHeader({ eyebrow, title, subtitle, action }: Props) {
   return (
-    <header className="flex items-start justify-between gap-4 flex-wrap">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
         {eyebrow && (
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -38,7 +38,7 @@ export function PageHeader({ eyebrow, title, subtitle, action }: Props) {
           </p>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="shrink-0 w-full sm:w-auto [&>a]:w-full sm:[&>a]:w-auto [&>button]:w-full sm:[&>button]:w-auto [&>a]:justify-center sm:[&>a]:justify-start [&>button]:justify-center sm:[&>button]:justify-start">{action}</div>}
     </header>
   );
 }
