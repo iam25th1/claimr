@@ -22,6 +22,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
 
+    // Surface env-config issues clearly. Without the key, every signup fails
+    // with an opaque 500. This makes the failure mode visible.
+    if (!process.env.CIRCLE_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            "CIRCLE_API_KEY is not set in Vercel env vars. Auth cannot proceed until it is configured.",
+        },
+        { status: 500 }
+      );
+    }
+
     const userId = emailToUserId(email);
     const client = getCircleClient();
 
@@ -36,7 +48,11 @@ export async function POST(req: NextRequest) {
       if (code !== 155101) {
         console.error("[CIRCLE/onboard] createUser failed", err);
         return NextResponse.json(
-          { error: "Could not create Circle user" },
+          {
+            error: `Could not create Circle user: ${
+              err?.response?.data?.message ?? err?.message ?? "unknown"
+            }`,
+          },
           { status: 500 }
         );
       }
@@ -55,40 +71,56 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Open a PIN-setup-and-wallet-init challenge for Arc Testnet. The SDK
-    //    will resolve this via the iframe PIN flow on the client.
-    const challengeResp = await client.createUserPinWithWallets({
-      userToken,
-      accountType: "EOA",
-      blockchains: [ARC_TESTNET_BLOCKCHAIN],
-      idempotencyKey: newIdempotencyKey(),
-    } as any);
-    const challengeId = challengeResp.data?.challengeId;
-    if (!challengeId) {
-      // If the user already set a PIN previously (e.g. completed signup before
-      // but lost their session), the wallet-init challenge will not be returned.
-      // In that case we still hand back the session tokens so the client can
-      // proceed to finalize (existing wallet lookup).
-      return NextResponse.json(
-        {
-          userToken,
-          encryptionKey,
-          challengeId: null,
-          alreadyInitialized: true,
-        },
-        { status: 200 }
-      );
+    //    will resolve this via the iframe PIN flow on the client. For users
+    //    who already have a PIN and wallet, Circle returns an error code we
+    //    treat as "already initialized" and skip the client-side challenge.
+    let challengeId: string | null = null;
+    let alreadyInitialized = false;
+    try {
+      const challengeResp = await client.createUserPinWithWallets({
+        userToken,
+        accountType: "EOA",
+        blockchains: [ARC_TESTNET_BLOCKCHAIN],
+        idempotencyKey: newIdempotencyKey(),
+      } as any);
+      challengeId = challengeResp.data?.challengeId ?? null;
+      if (!challengeId) alreadyInitialized = true;
+    } catch (err: any) {
+      // Common case: user already has PIN + wallet, Circle rejects the call.
+      // Treat as already-initialized so the client can skip the PIN sheet
+      // and go straight to finalize (which looks up the existing wallet).
+      const code = err?.response?.data?.code ?? err?.code;
+      // 155206 (pinAlreadySet) / 155709 (walletAlreadyExists). Treat any
+      // existing-state error as "we're good, skip the challenge".
+      if (code === 155206 || code === 155709) {
+        alreadyInitialized = true;
+      } else {
+        console.error("[CIRCLE/onboard] createUserPinWithWallets failed", err);
+        return NextResponse.json(
+          {
+            error: `Could not start PIN challenge: ${
+              err?.response?.data?.message ?? err?.message ?? "unknown"
+            }`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({
       userToken,
       encryptionKey,
       challengeId,
-      alreadyInitialized: false,
+      alreadyInitialized,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[CIRCLE/onboard] FATAL", err);
     return NextResponse.json(
-      { error: "Internal onboarding error" },
+      {
+        error: `Internal onboarding error: ${
+          err?.message ?? "unknown error, check Vercel function logs"
+        }`,
+      },
       { status: 500 }
     );
   }

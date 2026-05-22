@@ -1,21 +1,22 @@
 "use client";
 
-// Onboarding flow, rebuilt.
+// Onboarding flow with explicit sign-in vs sign-up modes.
 //
-// Four (sometimes five) steps:
-//   1. Role pick           shown only when ?role= is not in the URL
-//   2. Email + sign up      calls signUp(), shows a verifying state while
-//                          Circle handles OTP + wallet provisioning
-//   3. Wallet ready         shows the new address + live USDC balance
-//                          plus a "Fund wallet" CTA and continue button
-//   4. Profile (optional)   name, X handle, bio, all skippable
-//   5. Done                redirects to the right dashboard
+// URL params:
+//   mode  signin | signup    default signup
+//   role  creator | project  optional, default depends on mode
 //
-// Design rules:
-//   - Honest UI. Never display a "verified" or "connected" state we
-//     haven't actually reached.
-//   - Loading + empty + error states explicit on every async surface.
-//   - Persistence via the profile store added in flow-fix.
+// Sign up flow:
+//   1. Role pick (skipped if ?role= in URL)
+//   2. Email + Circle wallet explainer
+//   3. Verifying (Circle handles OTP + PIN)
+//   4. Wallet ready (address + balance + fund button)
+//   5. Profile (optional, skippable)
+//
+// Sign in flow:
+//   1. Email
+//   2. Verifying
+//   3. Done, redirect to /dashboard or /project (per role param, default /dashboard)
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,6 +33,7 @@ import {
   Twitter,
   Sparkles,
   Wallet,
+  AlertCircle,
 } from "lucide-react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
@@ -47,42 +49,72 @@ import {
 } from "@/lib/profile-store";
 
 type Role = "creator" | "project";
+type Mode = "signin" | "signup";
 type Step = "role" | "email" | "verifying" | "wallet" | "profile";
 
-const STEP_ORDER: Step[] = ["role", "email", "verifying", "wallet", "profile"];
+const SIGNUP_STEPS: Step[] = ["role", "email", "verifying", "wallet", "profile"];
+const SIGNIN_STEPS: Step[] = ["email", "verifying"];
 
 export function OnboardingCards() {
   const router = useRouter();
   const params = useSearchParams();
   const { ready, authenticated, user, signUp } = useAuth();
 
-  const urlRole = params.get("role");
-  const initialRole: Role | null =
-    urlRole === "project" ? "project" : urlRole === "creator" ? "creator" : null;
+  const urlMode = params.get("mode") === "signin" ? "signin" : "signup";
+  const urlRole =
+    params.get("role") === "project"
+      ? "project"
+      : params.get("role") === "creator"
+      ? "creator"
+      : null;
 
-  const [role, setRole] = useState<Role | null>(initialRole);
-  const [step, setStep] = useState<Step>(
-    authenticated ? "wallet" : initialRole ? "email" : "role"
-  );
+  const [mode, setMode] = useState<Mode>(urlMode);
+  const [role, setRole] = useState<Role | null>(urlRole);
+  const [step, setStep] = useState<Step>(() => {
+    if (authenticated) return mode === "signup" ? "wallet" : "email";
+    if (mode === "signin") return "email";
+    return urlRole ? "email" : "role";
+  });
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // If the auth context catches up after mount and the user is already
-  // signed in, fast-forward to the wallet step.
+  // Bounce if already authenticated and they came in for sign-in.
   useEffect(() => {
     if (!ready) return;
-    if (authenticated && (step === "role" || step === "email")) {
-      setStep("wallet");
+    if (authenticated && mode === "signin") {
+      router.replace(role === "project" ? "/project" : "/dashboard/discover");
     }
-  }, [ready, authenticated, step]);
+  }, [ready, authenticated, mode, role, router]);
 
-  // Once we have a wallet address and we're past email step, move forward.
+  // Verifying -> next step when wallet is ready.
   useEffect(() => {
-    if (step === "verifying" && authenticated && user?.walletAddress) {
-      setStep("wallet");
+    if (step !== "verifying") return;
+    if (!authenticated) return;
+    if (mode === "signin") {
+      router.replace(role === "project" ? "/project" : "/dashboard/discover");
+      return;
     }
-  }, [step, authenticated, user?.walletAddress]);
+    if (user?.walletAddress) setStep("wallet");
+  }, [step, authenticated, user?.walletAddress, mode, role, router]);
+
+  const visibleSteps = useMemo(() => {
+    if (mode === "signin") return SIGNIN_STEPS;
+    return urlRole
+      ? SIGNUP_STEPS.filter((s) => s !== "role")
+      : SIGNUP_STEPS;
+  }, [mode, urlRole]);
+  const currentIndex = visibleSteps.indexOf(step);
+
+  const handleModeSwitch = (newMode: Mode) => {
+    setMode(newMode);
+    setError(null);
+    if (newMode === "signin") {
+      setStep("email");
+    } else {
+      setStep(urlRole ? "email" : "role");
+    }
+  };
 
   const handleRolePick = (picked: Role) => {
     setRole(picked);
@@ -98,11 +130,8 @@ export function OnboardingCards() {
     setStep("verifying");
     try {
       await signUp(email.trim());
-      // The verifying -> wallet transition is handled by the useEffect
-      // above that watches user.walletAddress. signUp may resolve before
-      // the address is populated.
     } catch (err: any) {
-      setError(err?.message ?? "Could not complete signup.");
+      setError(err?.message ?? "Authentication failed.");
       setStep("email");
     } finally {
       setSubmitting(false);
@@ -110,39 +139,45 @@ export function OnboardingCards() {
   };
 
   const handleFinish = () => {
-    if (!role) return;
     router.replace(role === "project" ? "/project" : "/dashboard/discover");
   };
 
-  // Compute the visible-step list (drops "role" if URL provided one).
-  const visibleSteps = useMemo(
-    () => STEP_ORDER.filter((s) => (initialRole ? s !== "role" : true)),
-    [initialRole]
-  );
-  const currentIndex = visibleSteps.indexOf(step);
-
   return (
     <div className="mx-auto max-w-xl px-6 pt-24 pb-24">
-      <ProgressDots total={visibleSteps.length} current={currentIndex} />
+      {/* Mode toggle - hidden during in-flight steps so it doesn't shift under the user */}
+      {(step === "role" || step === "email") && (
+        <ModeToggle mode={mode} onChange={handleModeSwitch} />
+      )}
+
+      {visibleSteps.length > 1 && (
+        <div className="mt-6">
+          <ProgressDots total={visibleSteps.length} current={currentIndex} />
+        </div>
+      )}
 
       <div className="mt-10">
-        {step === "role" && <RoleStep onPick={handleRolePick} />}
+        {step === "role" && mode === "signup" && (
+          <RoleStep onPick={handleRolePick} />
+        )}
 
         {step === "email" && (
           <EmailStep
+            mode={mode}
             role={role}
             email={email}
             setEmail={setEmail}
             submitting={submitting}
             error={error}
             onSubmit={handleEmailSubmit}
-            onBack={initialRole ? undefined : () => setStep("role")}
+            onBack={
+              mode === "signup" && !urlRole ? () => setStep("role") : undefined
+            }
           />
         )}
 
-        {step === "verifying" && <VerifyingStep email={email} />}
+        {step === "verifying" && <VerifyingStep mode={mode} email={email} />}
 
-        {step === "wallet" && role && (
+        {step === "wallet" && role && mode === "signup" && (
           <WalletStep
             role={role}
             walletAddress={user?.walletAddress ?? null}
@@ -159,6 +194,60 @@ export function OnboardingCards() {
         )}
       </div>
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Mode toggle
+// ----------------------------------------------------------------------
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: Mode;
+  onChange: (m: Mode) => void;
+}) {
+  return (
+    <div className="flex justify-center">
+      <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1 backdrop-blur-sm">
+        <ToggleButton
+          active={mode === "signup"}
+          onClick={() => onChange("signup")}
+        >
+          Sign up
+        </ToggleButton>
+        <ToggleButton
+          active={mode === "signin"}
+          onClick={() => onChange("signin")}
+        >
+          Sign in
+        </ToggleButton>
+      </div>
+    </div>
+  );
+}
+
+function ToggleButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+        active
+          ? "bg-[#FF2D7A] text-white"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -186,7 +275,7 @@ function ProgressDots({ total, current }: { total: number; current: number }) {
 }
 
 // ----------------------------------------------------------------------
-// Step 1, role pick
+// Role pick (signup only)
 // ----------------------------------------------------------------------
 
 function RoleStep({ onPick }: { onPick: (role: Role) => void }) {
@@ -195,7 +284,7 @@ function RoleStep({ onPick }: { onPick: (role: Role) => void }) {
       <Heading
         eyebrow="Get started"
         title="How will you use Claimr?"
-        subtitle="Pick one. You can switch later."
+        subtitle="Pick one. You can use the other side from the same account later."
       />
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -258,10 +347,11 @@ function RoleCard({
 }
 
 // ----------------------------------------------------------------------
-// Step 2, email
+// Email step
 // ----------------------------------------------------------------------
 
 function EmailStep({
+  mode,
   role,
   email,
   setEmail,
@@ -270,6 +360,7 @@ function EmailStep({
   onSubmit,
   onBack,
 }: {
+  mode: Mode;
   role: Role | null;
   email: string;
   setEmail: (v: string) => void;
@@ -278,26 +369,43 @@ function EmailStep({
   onSubmit: (e: React.FormEvent) => void;
   onBack?: () => void;
 }) {
+  const isSignup = mode === "signup";
   return (
     <div>
       <Heading
-        eyebrow={role === "project" ? "Project signup" : "Creator signup"}
-        title={
-          role === "project"
-            ? "Post jobs and pay on verification"
-            : "Claim work and get paid in USDC"
+        eyebrow={
+          isSignup
+            ? role === "project"
+              ? "Project signup"
+              : role === "creator"
+              ? "Creator signup"
+              : "Get started"
+            : "Welcome back"
         }
-        subtitle="Enter your email. We'll set up your wallet for you."
+        title={
+          isSignup
+            ? role === "project"
+              ? "Post jobs and pay on verification"
+              : "Claim work and get paid in USDC"
+            : "Sign in to your account"
+        }
+        subtitle={
+          isSignup
+            ? "Enter your email. We'll create a wallet for you."
+            : "Enter the email you used to sign up. We'll send a code."
+        }
       />
 
-      <div className="mt-6 flex items-start gap-3 rounded-xl border border-[#2D6EFF]/20 bg-[#2D6EFF]/5 p-4">
-        <ShieldCheck className="h-5 w-5 shrink-0 text-[#2D6EFF] mt-0.5" />
-        <div className="text-xs text-foreground/85 leading-relaxed">
-          We create a non-custodial Circle wallet for you when you sign up. No
-          MetaMask, no seed phrase, no browser extension. You sign transactions
-          with a PIN.
+      {isSignup && (
+        <div className="mt-6 flex items-start gap-3 rounded-xl border border-[#2D6EFF]/20 bg-[#2D6EFF]/5 p-4">
+          <ShieldCheck className="h-5 w-5 shrink-0 text-[#2D6EFF] mt-0.5" />
+          <div className="text-xs text-foreground/85 leading-relaxed">
+            We create a non-custodial Circle wallet for you when you sign up. No
+            MetaMask, no seed phrase, no browser extension. You sign transactions
+            with a PIN.
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div className="relative">
@@ -315,8 +423,9 @@ function EmailStep({
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {error}
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <p className="break-words">{error}</p>
           </div>
         )}
 
@@ -337,7 +446,7 @@ function EmailStep({
             disabled={submitting || !email.trim()}
             className="flex items-center gap-2 rounded-xl bg-[#FF2D7A] px-5 py-3 text-sm font-medium text-white transition-all hover:bg-[#FF2D7A]/90 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Continue
+            {isSignup ? "Create account" : "Sign in"}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -347,18 +456,22 @@ function EmailStep({
 }
 
 // ----------------------------------------------------------------------
-// Step 3, verifying
+// Verifying step
 // ----------------------------------------------------------------------
 
-function VerifyingStep({ email }: { email: string }) {
-  // Rotate reassurance copy every couple of seconds so the spinner doesn't
-  // feel static.
-  const messages = [
+function VerifyingStep({ mode, email }: { mode: Mode; email: string }) {
+  const signupMessages = [
     "Sending you a verification code...",
     "Creating your Circle wallet...",
     "Provisioning your address on Arc...",
     "Almost there, finalising...",
   ];
+  const signinMessages = [
+    "Sending you a verification code...",
+    "Loading your wallet...",
+    "Signing you in...",
+  ];
+  const messages = mode === "signup" ? signupMessages : signinMessages;
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     const i = setInterval(() => setIdx((n) => (n + 1) % messages.length), 2500);
@@ -371,7 +484,7 @@ function VerifyingStep({ email }: { email: string }) {
         <Loader2 className="h-8 w-8 animate-spin text-[#FF2D7A]" />
       </div>
       <h1 className="mt-6 text-2xl font-bold text-foreground">
-        Setting things up
+        {mode === "signup" ? "Setting things up" : "Signing you in"}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Check {email || "your inbox"} for the verification code from Circle.
@@ -387,7 +500,7 @@ function VerifyingStep({ email }: { email: string }) {
 }
 
 // ----------------------------------------------------------------------
-// Step 4, wallet ready
+// Wallet ready step (signup only)
 // ----------------------------------------------------------------------
 
 function WalletStep({
@@ -402,7 +515,6 @@ function WalletStep({
   const [fundOpen, setFundOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Live USDC balance, refreshes via wagmi
   const { data: usdcRaw } = useReadContract({
     address: USDC_ADDRESS,
     abi: USDC_ABI,
@@ -410,7 +522,7 @@ function WalletStep({
     args: [walletAddress as `0x${string}`],
     query: {
       enabled: !!walletAddress,
-      refetchInterval: 5000, // poll every 5s so funding lands visibly
+      refetchInterval: 5000,
     },
   });
   const balance = usdcRaw
@@ -459,7 +571,6 @@ function WalletStep({
         compact
       />
 
-      {/* Address + balance */}
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -540,7 +651,7 @@ function WalletStep({
 }
 
 // ----------------------------------------------------------------------
-// Step 5, profile
+// Profile step (signup only, optional)
 // ----------------------------------------------------------------------
 
 function ProfileStep({
@@ -552,8 +663,6 @@ function ProfileStep({
   walletAddress: string;
   onFinish: () => void;
 }) {
-  // Seed initial values from any existing profile (in case someone
-  // re-enters onboarding).
   const [name, setName] = useState(
     () =>
       (role === "project"

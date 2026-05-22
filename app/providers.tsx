@@ -41,7 +41,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string) => {
-    // 1. Backend creates the Circle user, issues a session token, opens a wallet-init challenge.
+    // 1. Backend creates the Circle user (idempotent), issues a session token,
+    //    opens a PIN+wallet challenge if needed.
     const onboard = await fetch("/api/circle/onboard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -49,14 +50,31 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!onboard.ok) {
       const err = await onboard.json().catch(() => ({}));
-      throw new Error(err?.error ?? "Could not start signup");
+      // Surface the actual error message from the API so the UI can show
+      // something more useful than "Internal onboarding error". Falls back
+      // to a status-based message if the body didn't include `error`.
+      const apiError =
+        err?.error ??
+        `Onboarding failed (HTTP ${onboard.status}). Check that CIRCLE_API_KEY is set in Vercel env vars.`;
+      throw new Error(apiError);
     }
-    const { userToken, encryptionKey, challengeId } = await onboard.json();
+    const { userToken, encryptionKey, challengeId, alreadyInitialized } =
+      await onboard.json();
 
-    // 2. Client SDK takes the user through PIN + security-question setup.
-    await executeChallenge(challengeId, { userToken, encryptionKey });
+    // 2. Run the PIN+wallet challenge only when one was issued. Returning
+    //    users with an existing PIN won't get a challenge - skip directly
+    //    to finalize. This was a bug previously: executeChallenge(null) threw.
+    if (challengeId && !alreadyInitialized) {
+      try {
+        await executeChallenge(challengeId, { userToken, encryptionKey });
+      } catch (err: any) {
+        // Cancel inside the PIN sheet is the most common reason this rejects.
+        const msg = err?.message ?? "PIN entry cancelled.";
+        throw new Error(msg);
+      }
+    }
 
-    // 3. Backend records the session cookie and fetches the freshly created wallet.
+    // 3. Backend records the session cookie and fetches the wallet (new or existing).
     const finalize = await fetch("/api/circle/finalize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -64,7 +82,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!finalize.ok) {
       const err = await finalize.json().catch(() => ({}));
-      throw new Error(err?.error ?? "Could not finalize signup");
+      throw new Error(err?.error ?? `Finalize failed (HTTP ${finalize.status}).`);
     }
     const data = await finalize.json();
     setUser({
