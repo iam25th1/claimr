@@ -1,43 +1,94 @@
-Vercel build fix + admin cleanup
+Three fixes batch
 
-The build failure is two files importing isAdminWallet from
-lib/admin-auth.ts. That export disappeared when the Phase B admin batch
-replaced admin-auth.ts with the new useIsAdmin hook. The fix is in two
-parts:
+1. Slots on post job  (the "how many people can take this" feature)
+2. Personal USDC balance on /project dashboard
+3. Honest swap rate display
 
-  1. lib/admin-auth.ts                REBUILT (zip overwrites)
-     Adds isAdminWallet(addr) back as a compatibility export. Old files
-     that still import it will compile. New code keeps using useIsAdmin().
 
-  2. apply-admin-cleanup.js           REMOVES OLD /admin/ FILES
-     Deletes the old admin pages from app/admin/, which are obsolete now
-     that /hq/c8m4z2/ has taken over. Without this, the old URL still
-     works and the security obscurity is undone.
+Slots on post job
 
-  Files removed by the script (only if present):
-     app/admin/layout.tsx
-     app/admin/page.tsx
-     app/admin/jobs/
-     app/admin/verifier/
-     app/admin/wallets/
-     app/admin/activity/
+  components/claimr/post-job-stepper.tsx           PATCHED
 
-  Files NOT touched:
-     app/admin/seed/    seed script for test data, deliberate keep
+  Step 2 (Criteria + pay) now has a "How many creators can take this job?"
+  counter (1 - 10, default 1). Each slot is independently claimable by a
+  different creator.
+
+  Step 4 (Review) shows the total escrow (pay x slots) and a heads-up that
+  multi-slot posts require N+1 PIN entries (1 approve + N postJob calls).
+
+  Lock flow:
+    1. Approve total = pay x slots in one transaction
+    2. Post N separate jobs on chain, each locking pay USDC, all using
+       the same title and criteria
+    3. Progress UI shows "Posting job 1 of N", "Posting job 2 of N", etc.
+
+  Contract reality: the on-chain contract is one-claimer-per-job. This is
+  a UI workaround that creates N siblings - same title, same criteria,
+  separate jobs that creators claim independently. To the user it feels
+  like a multi-slot job. On chain it's N posts.
+
+
+Personal USDC balance
+
+  components/claimr/project-stats.tsx              REBUILT
+
+  Was 3 cards (In escrow, Active, Completed). Now 4 cards:
+    Your USDC      personal wallet balance, refetches every 8s
+    In escrow      same as before
+    Active jobs    same
+    Completed      same
+
+  Reads USDC.balanceOf(walletAddress) via wagmi useReadContract. No new
+  env vars or backend changes.
+
+
+Honest swap rate
+
+  components/claimr/swap-card.tsx                  REBUILT
+
+  Removed the misleading hardcoded "estimatedOut = amount * 0.918" line.
+  The 0.918 rate was a UI fiction - the actual rate is whatever the
+  Starlight pool decides at swap time, which on testnet can be very far
+  from 1:1.
+
+  New behaviour:
+    - The "To" panel says "Rate set by liquidity pool" instead of showing
+      a fake number
+    - A disclaimer below explains rates are determined at swap time and
+      testnet rates can vary significantly
+    - After the swap completes, the destination balance is refetched and
+      diffed against the pre-swap value, then the actual amount received
+      is shown in a success banner for 8 seconds
+
+  This means the user sees the true number ("You received 1.20 EURC")
+  instead of a misleading "1.20 EURC where 18.36 was implied".
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-admin-cleanup.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-admin-cleanup.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-admin-cleanup.js
+  Move-Item C:\Users\Bright\Downloads\claimr-three-fixes.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-three-fixes.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; git status
   git add -A
-  git commit -m "admin: cleanup old /admin/ pages + compat shim for isAdminWallet"
+  git commit -m "feat: slot-based posting + balance card + honest swap rates"
   git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Verify after Vercel rebuild
+Test on Vercel
 
-  - /hq/c8m4z2           management overview loads (works)
-  - /admin               returns 404 (the old URL is dead, scramble holds)
-  - /admin/seed          still works (kept on purpose)
+  Slots:
+    /project/post -> Step 2 -> set slots to 3, pay to 10 -> Step 4 should
+    show "Total escrow: 30 USDC (10 x 3)" and warn about 4 PIN entries.
+    Confirm with PIN. Should create 3 sibling jobs on chain.
+
+  Balance card:
+    /project -> top stats row should now have 4 cards, leftmost is
+    "Your USDC" with your current wallet balance.
+
+  Swap honesty:
+    /dashboard/wallet -> Convert card -> enter 5 USDC. The "To" panel
+    should no longer show a fake estimate. After the swap, you'll see
+    "You received X.XX EURC" with the actual amount that landed.
+
+
+Strict tsc clean across the stack.

@@ -41,6 +41,12 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 type FormStep = 1 | 2 | 3 | 4;
 type LockPhase = "idle" | "approving" | "posting" | "success";
 
+// Slots = how many creators can take the job. UI workaround for the
+// contract's one-claimer-per-job model: we lock pay * slots USDC and
+// call postJob() slots times in a single flow.
+const MIN_SLOTS = 1;
+const MAX_SLOTS = 10;
+
 const CATEGORIES = ["KOL", "Writing", "Design", "Dev", "Video"] as const;
 
 export function PostJobStepper() {
@@ -59,6 +65,7 @@ export function PostJobStepper() {
   const [criteria, setCriteria] = useState("");
   const [pay, setPay] = useState("");
   const [duration, setDuration] = useState("7");
+  const [slots, setSlots] = useState("1");
 
   // Step 3 - Visibility
   const [isPrivate, setIsPrivate] = useState(false);
@@ -66,15 +73,27 @@ export function PostJobStepper() {
 
   // Step 4 - Lock phase
   const [lockPhase, setLockPhase] = useState<LockPhase>("idle");
+  const [currentSlot, setCurrentSlot] = useState(0); // 1-indexed during posting
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Derived: validated slot count and total escrow.
+  const slotCount = (() => {
+    const n = parseInt(slots, 10);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(MAX_SLOTS, Math.max(MIN_SLOTS, n));
+  })();
+  const payNumber = parseFloat(pay) || 0;
+  const totalEscrow = payNumber * slotCount;
 
   // Step navigation
   const canAdvanceFrom1 = title.trim().length >= 3;
   const canAdvanceFrom2 =
     criteria.trim().length >= 3 &&
     !!pay &&
-    parseFloat(pay) > 0 &&
-    !!duration;
+    payNumber > 0 &&
+    !!duration &&
+    slotCount >= MIN_SLOTS &&
+    slotCount <= MAX_SLOTS;
   const canAdvanceFrom3 = !isPrivate || /^0x[a-fA-F0-9]{40}$/.test(invitedCreator);
 
   const handleLockAndPost = async () => {
@@ -84,30 +103,38 @@ export function PostJobStepper() {
     }
 
     setErrorMsg(null);
-    const amountWei = parseUnits(pay, 6);
+    const perJobWei = parseUnits(pay, 6);
+    const totalWei = perJobWei * BigInt(slotCount);
 
     try {
+      // 1. Approve total once - covers every postJob() that follows.
       setLockPhase("approving");
+      setCurrentSlot(0);
       await execute({
         contractAddress: USDC_ADDRESS,
         abiFunctionSignature: "approve(address,uint256)",
-        abiParameters: [CLAIMR_ESCROW_ADDRESS, amountWei.toString()],
+        abiParameters: [CLAIMR_ESCROW_ADDRESS, totalWei.toString()],
       });
 
+      // 2. Post N jobs sequentially. Each is its own on-chain job; UI
+      //    just groups the flow into one stepper.
       setLockPhase("posting");
-      await execute({
-        contractAddress: CLAIMR_ESCROW_ADDRESS,
-        abiFunctionSignature:
-          "postJob(string,string,uint256,uint256,bool,address)",
-        abiParameters: [
-          title,
-          criteria,
-          amountWei.toString(),
-          duration,
-          isPrivate,
-          invitedCreator || ZERO_ADDRESS,
-        ],
-      });
+      for (let i = 1; i <= slotCount; i++) {
+        setCurrentSlot(i);
+        await execute({
+          contractAddress: CLAIMR_ESCROW_ADDRESS,
+          abiFunctionSignature:
+            "postJob(string,string,uint256,uint256,bool,address)",
+          abiParameters: [
+            title,
+            criteria,
+            perJobWei.toString(),
+            duration,
+            isPrivate,
+            invitedCreator || ZERO_ADDRESS,
+          ],
+        });
+      }
 
       setLockPhase("success");
       setTimeout(() => router.push("/project"), 2500);
@@ -118,6 +145,7 @@ export function PostJobStepper() {
           : "Transaction failed."
       );
       setLockPhase("idle");
+      setCurrentSlot(0);
     }
   };
 
@@ -163,6 +191,10 @@ export function PostJobStepper() {
           setPay={setPay}
           duration={duration}
           setDuration={setDuration}
+          slots={slots}
+          setSlots={setSlots}
+          slotCount={slotCount}
+          totalEscrow={totalEscrow}
           canAdvance={canAdvanceFrom2}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
@@ -189,6 +221,9 @@ export function PostJobStepper() {
           criteria={criteria}
           pay={pay}
           duration={duration}
+          slotCount={slotCount}
+          totalEscrow={totalEscrow}
+          currentSlot={currentSlot}
           isPrivate={isPrivate}
           invitedCreator={invitedCreator}
           lockPhase={lockPhase}
@@ -339,6 +374,10 @@ function Step2({
   setPay,
   duration,
   setDuration,
+  slots,
+  setSlots,
+  slotCount,
+  totalEscrow,
   canAdvance,
   onBack,
   onNext,
@@ -349,6 +388,10 @@ function Step2({
   setPay: (v: string) => void;
   duration: string;
   setDuration: (v: string) => void;
+  slots: string;
+  setSlots: (v: string) => void;
+  slotCount: number;
+  totalEscrow: number;
   canAdvance: boolean;
   onBack: () => void;
   onNext: () => void;
@@ -373,7 +416,7 @@ function Step2({
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Payment">
+        <Field label="Payment per creator">
           <div className="relative">
             <input
               type="number"
@@ -407,6 +450,47 @@ function Step2({
           </div>
         </Field>
       </div>
+
+      <Field
+        label="How many creators can take this job?"
+        hint="Each creator claims one slot independently. Pay locks per slot."
+      >
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSlots(String(Math.max(MIN_SLOTS, slotCount - 1)))}
+            disabled={slotCount <= MIN_SLOTS}
+            className="h-10 w-10 shrink-0 rounded-lg border border-white/10 bg-white/5 text-foreground hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-lg leading-none"
+          >
+            -
+          </button>
+          <input
+            type="number"
+            value={slots}
+            onChange={(e) => setSlots(e.target.value)}
+            min={MIN_SLOTS}
+            max={MAX_SLOTS}
+            className={`${inputStyle} text-center`}
+          />
+          <button
+            type="button"
+            onClick={() => setSlots(String(Math.min(MAX_SLOTS, slotCount + 1)))}
+            disabled={slotCount >= MAX_SLOTS}
+            className="h-10 w-10 shrink-0 rounded-lg border border-white/10 bg-white/5 text-foreground hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-lg leading-none"
+          >
+            +
+          </button>
+        </div>
+        {totalEscrow > 0 && slotCount > 1 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Total escrow:{" "}
+            <span className="text-green-400 font-semibold">
+              {totalEscrow} USDC
+            </span>{" "}
+            ({pay} USDC × {slotCount} creators)
+          </p>
+        )}
+      </Field>
 
       <StepNav canAdvance={canAdvance} onNext={onNext} onBack={onBack} />
     </FormCard>
@@ -540,6 +624,9 @@ function Step4({
   criteria,
   pay,
   duration,
+  slotCount,
+  totalEscrow,
+  currentSlot,
   isPrivate,
   invitedCreator,
   lockPhase,
@@ -552,6 +639,9 @@ function Step4({
   criteria: string;
   pay: string;
   duration: string;
+  slotCount: number;
+  totalEscrow: number;
+  currentSlot: number;
   isPrivate: boolean;
   invitedCreator: string;
   lockPhase: LockPhase;
@@ -559,6 +649,7 @@ function Step4({
   onLock: () => void;
 }) {
   const locking = lockPhase !== "idle";
+  const multi = slotCount > 1;
   return (
     <FormCard
       icon={<Eye className="h-5 w-5 text-[#FF2D7A]" />}
@@ -570,7 +661,18 @@ function Step4({
         {description && <SummaryRow label="Description" value={description} multiline />}
         <SummaryRow label="Category" value={category} />
         <SummaryRow label="Criteria" value={criteria} multiline />
-        <SummaryRow label="Payment" value={`${pay} USDC`} accent="green" />
+        <SummaryRow label="Payment per creator" value={`${pay} USDC`} accent="green" />
+        <SummaryRow
+          label="Creators needed"
+          value={`${slotCount} ${slotCount === 1 ? "slot" : "slots"}`}
+        />
+        {multi && (
+          <SummaryRow
+            label="Total escrow"
+            value={`${totalEscrow} USDC (${pay} × ${slotCount})`}
+            accent="green"
+          />
+        )}
         <SummaryRow label="Duration" value={`${duration} day${duration === "1" ? "" : "s"}`} />
         <SummaryRow label="Visibility" value={isPrivate ? "Invite-only" : "Open"} />
         {isPrivate && (
@@ -578,8 +680,26 @@ function Step4({
         )}
       </div>
 
+      {multi && !locking && (
+        <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-yellow-200/90 flex items-start gap-2">
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <p className="leading-relaxed">
+            You'll be asked to confirm with your PIN {slotCount + 1} times:
+            once to approve the total USDC, then once per job post.
+          </p>
+        </div>
+      )}
+
       {/* Lock progress visual - shows only while locking or after success */}
-      {locking && <LockProgress phase={lockPhase} pay={pay} />}
+      {locking && (
+        <LockProgress
+          phase={lockPhase}
+          pay={pay}
+          slotCount={slotCount}
+          currentSlot={currentSlot}
+          totalEscrow={totalEscrow}
+        />
+      )}
 
       {/* CTAs */}
       <div className="flex items-center justify-between gap-3 pt-2">
@@ -601,12 +721,12 @@ function Step4({
           {lockPhase === "success" ? (
             <>
               <CheckCircle2 className="h-4 w-4" />
-              Posted, redirecting...
+              {multi ? `${slotCount} posted, redirecting...` : "Posted, redirecting..."}
             </>
           ) : lockPhase === "idle" ? (
             <>
               <Lock className="h-4 w-4" />
-              Lock {pay || "0"} USDC + post
+              Lock {totalEscrow || pay || "0"} USDC + post
             </>
           ) : (
             <>
@@ -646,17 +766,34 @@ function SummaryRow({
   );
 }
 
-function LockProgress({ phase, pay }: { phase: LockPhase; pay: string }) {
+function LockProgress({
+  phase,
+  pay,
+  slotCount,
+  currentSlot,
+  totalEscrow,
+}: {
+  phase: LockPhase;
+  pay: string;
+  slotCount: number;
+  currentSlot: number;
+  totalEscrow: number;
+}) {
+  const multi = slotCount > 1;
   const phases = [
     {
       key: "approving" as const,
-      label: "Approving USDC allowance",
+      label: `Approving ${multi ? `${totalEscrow}` : pay} USDC allowance`,
       hint: "Letting the escrow contract spend your USDC.",
     },
     {
       key: "posting" as const,
-      label: `Locking ${pay} USDC in escrow`,
-      hint: "Funds move into the escrow contract and the job goes live.",
+      label: multi
+        ? `Posting job ${currentSlot || 1} of ${slotCount}`
+        : `Locking ${pay} USDC in escrow`,
+      hint: multi
+        ? `Each post locks ${pay} USDC and creates a separate job on chain.`
+        : "Funds move into the escrow contract and the job goes live.",
     },
   ];
 
