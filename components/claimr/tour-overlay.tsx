@@ -25,7 +25,17 @@ const TOOLTIP_W = 320;
 const TOOLTIP_GAP = 16;
 const PADDING = 8;
 
-function pickPlacement(rect: Rect, vw: number, vh: number): "top" | "bottom" | "left" | "right" {
+// How aggressively we hunt for a target element that isn't measured yet.
+// 80ms * 40 = 3.2 seconds of patience, then we give up and render the
+// tooltip centered without a spotlight.
+const POLL_INTERVAL_MS = 80;
+const POLL_MAX_ATTEMPTS = 40;
+
+function pickPlacement(
+  rect: Rect,
+  vw: number,
+  vh: number
+): "top" | "bottom" | "left" | "right" {
   const spaceBottom = vh - (rect.top + rect.height);
   const spaceTop = rect.top;
   const spaceRight = vw - (rect.left + rect.width);
@@ -33,7 +43,8 @@ function pickPlacement(rect: Rect, vw: number, vh: number): "top" | "bottom" | "
   const max = Math.max(spaceBottom, spaceTop, spaceRight, spaceLeft);
   if (max === spaceBottom && spaceBottom >= 180) return "bottom";
   if (max === spaceTop && spaceTop >= 180) return "top";
-  if (max === spaceRight && spaceRight >= TOOLTIP_W + TOOLTIP_GAP) return "right";
+  if (max === spaceRight && spaceRight >= TOOLTIP_W + TOOLTIP_GAP)
+    return "right";
   if (max === spaceLeft && spaceLeft >= TOOLTIP_W + TOOLTIP_GAP) return "left";
   return "bottom";
 }
@@ -96,27 +107,35 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     h: 768,
   });
 
-  // Find target and measure. Re-measure on resize, scroll, and step change.
+  // Find target and measure. Polls until the element is both present
+  // AND has a real bounding box, then keeps watching for resize and
+  // scroll. Without polling, race conditions with route changes or
+  // async-rendered content leave the spotlight broken.
   useLayoutEffect(() => {
     if (step < 0 || step >= steps.length) {
       setRect(null);
       return;
     }
     const current = steps[step];
-    const measure = () => {
+
+    const measure = (): boolean => {
       setViewport({ w: window.innerWidth, h: window.innerHeight });
       const el = document.querySelector(current.target) as HTMLElement | null;
-      if (!el) {
-        setRect(null);
-        return;
-      }
-      // Scroll the target into view if it's offscreen, then re-measure.
+      if (!el) return false;
+
       const r = el.getBoundingClientRect();
+      // Element exists but isn't laid out yet (zero-size). Keep polling.
+      if (r.width < 1 || r.height < 1) return false;
+
       const offscreen =
-        r.top < 0 || r.bottom > window.innerHeight || r.left < 0 || r.right > window.innerWidth;
+        r.top < 0 ||
+        r.bottom > window.innerHeight ||
+        r.left < 0 ||
+        r.right > window.innerWidth;
+
       if (offscreen) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        // wait one frame after scroll for layout
+        // After scrolling, give the browser a frame to settle and remeasure.
         requestAnimationFrame(() => {
           const r2 = el.getBoundingClientRect();
           setRect({
@@ -126,25 +145,39 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
             height: r2.height + PADDING * 2,
           });
         });
-        return;
+        return true;
       }
+
       setRect({
         top: r.top - PADDING,
         left: r.left - PADDING,
         width: r.width + PADDING * 2,
         height: r.height + PADDING * 2,
       });
+      return true;
     };
-    measure();
-    // Use a brief delay too, for async-loaded content (cards arriving from
-    // wagmi reads, etc).
-    const t = setTimeout(measure, 300);
+
+    // Try once immediately. If it lands, just wire up the watchers.
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    if (!measure()) {
+      // Target not measurable yet. Poll for it.
+      let attempts = 0;
+      pollTimer = setInterval(() => {
+        attempts += 1;
+        if (measure() || attempts >= POLL_MAX_ATTEMPTS) {
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }, POLL_INTERVAL_MS);
+    }
+
     const onResize = () => measure();
     const onScroll = () => measure();
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScroll, true);
+
     return () => {
-      clearTimeout(t);
+      if (pollTimer) clearInterval(pollTimer);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onScroll, true);
     };
@@ -176,18 +209,11 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     ? tooltipPosition(rect, placement, viewport.w)
     : { top: viewport.h / 2 - 100, left: viewport.w / 2 - TOOLTIP_W / 2 };
 
-  // SVG mask gives a crisp cutout - the dim background is rendered by
-  // a path with even-odd fill rule, so the target rect is fully exempt.
   return (
     <div className="fixed inset-0 z-[55] pointer-events-none">
-      {/* Spotlight overlay using SVG mask. The full-screen rect is dimmed;
-          the inner rect punches out, leaving the target crisp. */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-auto"
-        onClick={() => {
-          /* swallow clicks on the dimmed area */
-        }}
-      >
+      {/* SVG cutout. Whole-screen dim rect + transparent inner rect via
+          mask, so the target stays fully crisp. */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-auto">
         <defs>
           <mask id="tour-cutout">
             <rect width="100%" height="100%" fill="white" />
@@ -228,7 +254,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
         )}
       </svg>
 
-      {/* Tooltip card. Always on top of the overlay, pointer events enabled. */}
+      {/* Tooltip card, always on top of the overlay. */}
       <div
         className="absolute pointer-events-auto"
         style={{

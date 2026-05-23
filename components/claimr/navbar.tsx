@@ -1,14 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { HelpCircle } from "lucide-react";
 import { Logo } from "@/components/claimr/logo";
-import { useAuth } from "@/lib/auth";
 import { useTour } from "@/lib/tour-state";
 
 export function Navbar() {
-  const { authenticated } = useAuth();
   const { startTour } = useTour();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleStartTour = () => {
+    // Set the tour state first so it's already at step 0 when /discover
+    // mounts. The TourProvider lives at the app root, so this state
+    // survives the route change.
+    startTour();
+    if (pathname !== "/dashboard/discover") {
+      router.push("/dashboard/discover");
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
@@ -37,10 +48,9 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          {/* Tour replay - only visible if a tour exists for the user. */}
           <button
             type="button"
-            onClick={startTour}
+            onClick={handleStartTour}
             title="Take a tour"
             aria-label="Take a tour"
             data-tour-id="tour-replay"
@@ -52,7 +62,7 @@ export function Navbar() {
             href="/dashboard/discover"
             className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#FF2D7A] to-[#2D6EFF] rounded-lg hover:opacity-90 transition-opacity"
           >
-            {authenticated ? "Open dashboard" : "Launch App"}
+            Explore
           </Link>
         </div>
       </div>
