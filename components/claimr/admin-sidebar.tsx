@@ -8,12 +8,14 @@ import {
   Activity,
   ShieldCheck,
   ChevronLeft,
+  Plus,
 } from "lucide-react";
 import { ADMIN_BASE_PATH } from "@/lib/admin-config";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Overview", href: `${ADMIN_BASE_PATH}` },
   { icon: Briefcase, label: "Jobs", href: `${ADMIN_BASE_PATH}/jobs` },
+  { icon: Plus, label: "Post platform job", href: `${ADMIN_BASE_PATH}/post`, highlight: true },
   { icon: ShieldCheck, label: "Verifier", href: `${ADMIN_BASE_PATH}/verifier` },
   { icon: Activity, label: "Activity", href: `${ADMIN_BASE_PATH}/activity` },
 ];
@@ -34,7 +36,7 @@ export function AdminSidebar() {
 
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map(({ icon: Icon, label, href }) => {
+          {navItems.map(({ icon: Icon, label, href, highlight }) => {
             const active = isActive(href);
             return (
               <li key={href}>
@@ -43,6 +45,8 @@ export function AdminSidebar() {
                   className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     active
                       ? "bg-white/10 text-foreground"
+                      : highlight
+                      ? "text-[#FF2D7A] hover:bg-[#FF2D7A]/10"
                       : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                   }`}
                 >

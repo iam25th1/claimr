@@ -7,6 +7,7 @@ import { useJobs } from "@/lib/useJobs";
 import { filterAndSortOpenJobs } from "@/lib/jobFilters";
 import { useAuth } from "@/lib/auth";
 import { useCircleWrite } from "@/lib/useCircleWrite";
+import { isPlatformJob } from "@/lib/admin-jobs";
 import { useState, useEffect } from "react";
 
 const COLORS = ["#FF2D7A", "#2D6EFF", "#10B981", "#8B5CF6", "#F59E0B", "#06B6D4"];
@@ -99,7 +100,14 @@ export function LatestJobs({ searchQuery = "", activeFilter = "All" }: LatestJob
                       {job.amount} USDC
                     </span>
                   </div>
-                  <h3 className="mt-1 font-medium text-foreground">{job.title}</h3>
+                  <h3 className="mt-1 font-medium text-foreground flex items-center gap-2 flex-wrap">
+                    {job.title}
+                    {isPlatformJob(job.project) && (
+                      <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider rounded-full bg-gradient-to-r from-[#FF2D7A]/15 to-[#2D6EFF]/15 text-[#FF2D7A] border border-[#FF2D7A]/30 font-semibold">
+                        Platform
+                      </span>
+                    )}
+                  </h3>
 
                   <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
                     <span>{job.criteria}</span>

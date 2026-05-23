@@ -7,6 +7,7 @@ import { useJobs } from "@/lib/useJobs";
 import { filterAndSortOpenJobs, hasActiveFilters } from "@/lib/jobFilters";
 import { useAuth } from "@/lib/auth";
 import { useCircleWrite } from "@/lib/useCircleWrite";
+import { isPlatformJob } from "@/lib/admin-jobs";
 import { useState, useEffect } from "react";
 
 interface FeaturedJobsProps {
@@ -115,7 +116,16 @@ export function FeaturedJobs({ searchQuery = "", activeFilter = "All" }: Feature
                     <p className="text-sm text-muted-foreground font-mono">
                       {job.project.slice(0, 6)}...{job.project.slice(-4)}
                     </p>
-                    <h3 className="mt-1 font-semibold text-foreground">{job.title}</h3>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-foreground">
+                        {job.title}
+                      </h3>
+                      {isPlatformJob(job.project) && (
+                        <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider rounded-full bg-gradient-to-r from-[#FF2D7A]/15 to-[#2D6EFF]/15 text-[#FF2D7A] border border-[#FF2D7A]/30 font-semibold">
+                          Platform
+                        </span>
+                      )}
+                    </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <span>{job.criteria}</span>

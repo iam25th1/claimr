@@ -2,6 +2,7 @@ import { PageHeader, SectionHeader } from "@/components/claimr/page-header";
 import { EarningsStats } from "@/components/claimr/earnings-stats";
 import { EarningsChart } from "@/components/claimr/earnings-chart";
 import { PaymentHistory } from "@/components/claimr/payment-history";
+import { GuestBanner } from "@/components/claimr/guest-banner";
 
 export default function EarningsPage() {
   return (
@@ -10,6 +11,11 @@ export default function EarningsPage() {
         eyebrow="Creator"
         title="Earnings"
         subtitle="Your payment history across every job you've claimed."
+      />
+
+      <GuestBanner
+        message="Sign in to see earnings from jobs you've completed."
+        returnPath="/dashboard/earnings"
       />
 
       <section>
