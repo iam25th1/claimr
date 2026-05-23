@@ -41,7 +41,6 @@ function UserProfileOrGuestCta() {
     return <div className="border-t border-border/50 p-4 h-[72px]" />;
   }
 
-  // Guest mode footer
   if (!authenticated) {
     return (
       <div className="border-t border-border/50 p-4">
@@ -101,7 +100,10 @@ export function DashboardSidebar() {
   const { authenticated } = useAuth();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 hidden md:flex md:flex-col border-r border-border/50 bg-background/80 backdrop-blur-xl">
+    <aside
+      data-tour-id="dashboard-sidebar"
+      className="fixed left-0 top-0 h-screen w-64 hidden md:flex md:flex-col border-r border-border/50 bg-background/80 backdrop-blur-xl"
+    >
       <div className="p-6">
         <Link href="/" className="flex items-center gap-2">
           <Logo size={32} />

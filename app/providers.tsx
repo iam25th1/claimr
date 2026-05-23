@@ -16,6 +16,7 @@ import {
   type AuthUser,
 } from "@/lib/auth";
 import { executeChallenge } from "@/lib/circle-client";
+import { TourProvider } from "@/lib/tour-state";
 
 const queryClient = new QueryClient();
 
@@ -169,7 +170,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <WagmiProvider config={config}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <TourProvider>{children}</TourProvider>
+        </AuthProvider>
       </WagmiProvider>
     </QueryClientProvider>
   );

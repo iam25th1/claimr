@@ -1,77 +1,234 @@
-MetaMask UX hardening
+Polish batch - audit, cleanup, tour, README, navbar fix
 
-What was happening
+================================
+SECURITY AUDIT FINDINGS
+================================
 
-  "Provider not found. Version: @wagmi/core@3.4.12"
-  wagmi can't connect because there's no window.ethereum in your browser.
-  Either MetaMask is not installed, is locked, or you're in a browser
-  without an extension. The connect button fired anyway, hit the error,
-  and surfaced wagmi's terse internal message to the user.
+CRITICAL:    None
+HIGH:        None
+MEDIUM:      None
+LOW:
+  - Server-side console.log statements in app/api/verify/route.ts and
+    app/api/circle/tx/contract-execution/route.ts log internal state
+    (wallet diagnostics, Claude responses). These hit Vercel function
+    logs, never the client. Acceptable for hackathon. For production
+    consider wrapping in if (process.env.NODE_ENV !== 'production').
 
-  "Error with Permissions-Policy header: Unrecognized feature: interest-cohort"
-  Benign. Some server header still references the deprecated FLoC
-  opt-out. Chrome dropped the feature name; the warning is cosmetic.
-  Doesn't affect anything in your app. Leave it alone or, if it really
-  bothers you, find where the header is set (vercel.json or
-  next.config.js headers()) and remove "interest-cohort=()" from the
-  Permissions-Policy value.
+POSITIVE FINDINGS:
+  - No hardcoded API keys or private keys anywhere in code
+  - No .env files committed (.gitignore correctly excludes .env*)
+  - VERIFIER_PRIVATE_KEY only referenced via process.env in server routes
+  - Admin email gate via ADMIN_EMAILS is properly server-side (non-public)
+  - Client-side console.error calls log only error messages, not secrets
+  - DebugPanel correctly gated behind process.env.NODE_ENV !== 'production'
 
+CODE BLOAT FINDINGS:
+  - components/ui/ has 57 files. Only 1 (skeleton.tsx) is actually used.
+    The other 56 are shadcn boilerplate from v0 scaffolding.
+  - package.json has ~28 @radix-ui/* + cmdk, embla-carousel-react,
+    input-otp, react-day-picker, vaul dependencies that exist purely
+    to support those dead ui/ files.
+  - 4 unused files in components/claimr/ (cleanup script handles these)
+  - post-job-stepper.tsx (945 lines) and onboarding-cards.tsx (935 lines)
+    are large but warranted - they contain the full multi-step flows.
 
-This batch
-
-  components/claimr/onboarding-cards.tsx           PATCHED
-
-  Two surgical changes:
-
-  1. Wallet detection on mount.
-     EmailStep now runs a useEffect on mount that checks
-     `window.ethereum`. The result is tri-state (null while detecting,
-     true if present, false if absent) and drives the button render:
-
-       null    button shown but disabled while detecting (~10ms)
-       true    "Connect MetaMask" button enabled
-       false   "Install MetaMask" link to metamask.io download page
-
-     No one clicks a button that's going to fail. Users without a
-     wallet see exactly what they need: an install link.
-
-  2. Translated error messages.
-     handleConnectWallet now catches the connect error and translates
-     wagmi's internal phrasing into something a user can act on:
-
-       "provider not found"          -> "No browser wallet detected.
-                                         Install MetaMask or another
-                                         browser wallet and refresh."
-       "user rejected"               -> "Wallet connection was cancelled."
-       "already pending"             -> "A wallet connection request is
-                                         already open. Check your
-                                         MetaMask extension."
-       anything else                 -> raw message (truncated wagmi
-                                         output is still better than
-                                         nothing)
+This batch only auto-removes the 4 confirmed-dead components/claimr/
+files. The ui/ + radix-ui pruning is bigger because it touches
+package-lock.json - included as a manual step at the bottom of these
+notes if you want to do it.
 
 
-Apply
+================================
+WHAT'S IN THIS BATCH
+================================
 
-  Move-Item C:\Users\Bright\Downloads\claimr-mm-detect.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-mm-detect.zip -DestinationPath claimr
-  cd C:\Users\Bright\Documents\GitHub\claimr ; git status
+NEW
+
+  lib/tour-state.tsx                    Tour context + provider. Tracks
+                                        active step, persists "seen"
+                                        flag in localStorage so the
+                                        welcome modal only shows once.
+                                        Provides startTour, skipTour,
+                                        nextStep, prevStep, finish.
+
+  components/claimr/welcome-modal.tsx   First-time visitor modal with
+                                        "Skip for now" or "Take the
+                                        tour". Backdrop click skips.
+                                        Esc/close button skips.
+
+  components/claimr/tour-overlay.tsx    The spotlight system. Uses an
+                                        SVG mask cutout so the target
+                                        element is FULLY CRISP - no
+                                        blur, no dim layer over it.
+                                        Animated pink outline pulses
+                                        around the target. Tooltip
+                                        auto-places to the side with
+                                        most room (top/bottom/left/right
+                                        chosen automatically). Locks
+                                        body scroll while active.
+                                        Re-measures on resize, scroll,
+                                        and step change. Auto-scrolls
+                                        offscreen targets into view.
+
+  components/claimr/discover-tour.tsx   Mounts WelcomeModal + TourOverlay
+                                        with 6 steps for /dashboard/
+                                        discover: header, search,
+                                        featured, latest, sidebar,
+                                        replay icon.
+
+  README.md                             Clean, no-jargon project doc.
+                                        Mermaid flow diagram, env var
+                                        list, collapsible sections for
+                                        auth flows, admin, verifier,
+                                        and contracts. License section.
+
+  apply-cleanup.js                      Removes 4 dead files from
+                                        components/claimr/. Self-
+                                        deletes on success.
+
+
+UPDATED
+
+  app/providers.tsx                     Wrapped children in TourProvider
+                                        so the navbar replay button and
+                                        the discover tour share state.
+
+  app/dashboard/discover/page.tsx       Added data-tour-id="discover-
+                                        header" wrapper + mounts
+                                        <DiscoverTour />.
+
+  components/claimr/discover-feed.tsx   data-tour-id wrappers around
+                                        SearchFilters, FeaturedJobs,
+                                        LatestJobs.
+
+  components/claimr/dashboard-sidebar.tsx
+                                        Added data-tour-id="dashboard-
+                                        sidebar" to the <aside>.
+
+  components/claimr/navbar.tsx          REMOVED the redundant Sign in
+                                        button next to Launch App.
+                                        ADDED a HelpCircle icon that
+                                        re-runs the tour. Shows "Open
+                                        dashboard" for signed-in users
+                                        and "Launch App" for guests on
+                                        the same single CTA.
+
+
+================================
+TOUR BEHAVIOR
+================================
+
+First visit (any browser, localStorage empty):
+  - User lands on /dashboard/discover
+  - Welcome modal appears centered with backdrop
+  - "Take the tour" -> step 0, modal closes, spotlight begins
+  - "Skip for now" or close -> sets seen flag, never auto-appears again
+
+Each step:
+  - SVG mask dims everything except a rounded rect around the target
+    (8px padding, 8px corner radius). Target is fully visible and
+    interactive-looking, though clicks are absorbed by the overlay
+    to keep the user inside the tour.
+  - Pink animated outline pulses around target
+  - Tooltip card on whichever side has the most room
+  - Step counter: "Step N of 6"
+  - Back disabled on step 0
+  - Last step shows "Finish" instead of "Next"
+  - X button at top-right of tooltip skips and marks seen
+
+Replay:
+  - HelpCircle icon in top-right of navbar
+  - Click any time -> step 0, runs full tour again
+  - Already-seen flag stays set (no re-prompt of welcome modal)
+
+
+================================
+APPLY
+================================
+
+  Move-Item C:\Users\Bright\Downloads\claimr-polish.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-polish.zip -DestinationPath claimr
+  cd C:\Users\Bright\Documents\GitHub\claimr ; node apply-cleanup.js
   git add -A
-  git commit -m "auth: detect injected wallet, swap connect button for install link when missing"
+  git commit -m "feat: spotlight tour + welcome modal + readme + dead code cleanup"
   git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Test
+================================
+TEST AFTER DEPLOY
+================================
 
-  Browser WITH MetaMask:
-    /onboarding -> see Connect MetaMask button -> click -> popup -> done
+  In incognito (fresh localStorage):
+    - Open /dashboard/discover
+    - Welcome modal appears
+    - Click "Take the tour"
+    - Step 1 of 6 - "Discover jobs" highlighted, page header crisp
+    - Click Next, advances exactly to step 2
+    - Continue through all 6 steps
+    - Last step shows Finish button
+    - Click Finish, overlay closes, normal page
 
-  Browser WITHOUT MetaMask (e.g., Safari, fresh Chrome, incognito with
-  extension disabled):
-    /onboarding -> see Install MetaMask link instead of the button
-    Clicking it opens metamask.io/download in a new tab
+  Replay test:
+    - Click HelpCircle icon in top-right of navbar
+    - Tour starts from step 1 again
+    - Welcome modal does NOT reappear (already marked seen)
 
-  Email flow still works in both browsers.
+  Navbar:
+    - Only one CTA button on the right side (no "Sign in" + "Launch App")
+    - Signed in: shows "Open dashboard"
+    - Signed out: shows "Launch App"
 
 
-Strict tsc clean.
+================================
+OPTIONAL: HEAVY CLEANUP (do this when you have 10 min to verify)
+================================
+
+The ui/ folder and ~30 unused npm packages are dead weight. They don't
+break anything but they bloat node_modules and slow npm ci. Manual steps
+because they touch package-lock.json which I don't want to corrupt:
+
+  1. cd C:\Users\Bright\Documents\GitHub\claimr
+  2. Open components/ui/ in File Explorer
+  3. Keep skeleton.tsx. Delete everything else (56 files).
+  4. Open package.json. Remove these dependencies:
+       @radix-ui/react-accordion
+       @radix-ui/react-alert-dialog
+       @radix-ui/react-aspect-ratio
+       @radix-ui/react-avatar
+       @radix-ui/react-checkbox
+       @radix-ui/react-collapsible
+       @radix-ui/react-context-menu
+       @radix-ui/react-dialog
+       @radix-ui/react-dropdown-menu
+       @radix-ui/react-hover-card
+       @radix-ui/react-menubar
+       @radix-ui/react-navigation-menu
+       @radix-ui/react-popover
+       @radix-ui/react-progress
+       @radix-ui/react-radio-group
+       @radix-ui/react-scroll-area
+       @radix-ui/react-select
+       @radix-ui/react-separator
+       @radix-ui/react-slider
+       @radix-ui/react-switch
+       @radix-ui/react-tabs
+       @radix-ui/react-toast
+       @radix-ui/react-toggle
+       @radix-ui/react-toggle-group
+       @radix-ui/react-tooltip
+       cmdk
+       embla-carousel-react
+       input-otp
+       react-day-picker
+       vaul
+     KEEP: @radix-ui/react-label, @radix-ui/react-slot, @hookform/resolvers
+     (those may still be used)
+  5. Delete package-lock.json
+  6. npm install (regenerates lockfile)
+  7. npm run build (verify nothing actually used those packages)
+  8. git add -A && git commit -m "chore: drop dead ui/ scaffolding"
+
+
+================================
+
+Strict tsc clean across all 9 source files changed.

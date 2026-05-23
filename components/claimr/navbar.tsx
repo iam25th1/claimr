@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { HelpCircle } from "lucide-react";
 import { Logo } from "@/components/claimr/logo";
 import { useAuth } from "@/lib/auth";
+import { useTour } from "@/lib/tour-state";
 
 export function Navbar() {
   const { authenticated } = useAuth();
-  // Launch App goes to /dashboard/discover for everyone. Guests can
-  // browse jobs and navigate. Sign-in is prompted when they try to do
-  // anything that needs an account (claim, post, submit, swap).
-  const launchHref = "/dashboard/discover";
+  const { startTour } = useTour();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
@@ -38,19 +37,22 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          {!authenticated && (
-            <Link
-              href="/onboarding?mode=signin"
-              className="hidden sm:inline-block px-3 py-2 text-sm text-[#a1a1aa] hover:text-white transition-colors"
-            >
-              Sign in
-            </Link>
-          )}
+          {/* Tour replay - only visible if a tour exists for the user. */}
+          <button
+            type="button"
+            onClick={startTour}
+            title="Take a tour"
+            aria-label="Take a tour"
+            data-tour-id="tour-replay"
+            className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#a1a1aa] hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
           <Link
-            href={launchHref}
+            href="/dashboard/discover"
             className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#FF2D7A] to-[#2D6EFF] rounded-lg hover:opacity-90 transition-opacity"
           >
-            Launch App
+            {authenticated ? "Open dashboard" : "Launch App"}
           </Link>
         </div>
       </div>
