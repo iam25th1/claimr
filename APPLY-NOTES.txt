@@ -1,133 +1,86 @@
-Browse mode + platform jobs
+Swap card - now actually useful
 
-Three things in this batch:
-  1. Launch App replaces Sign in in the navbar. Guests can browse the
-     entire app without signing in.
-  2. Guest banners on the gated pages (my-jobs, wallet, earnings) with
-     a clear Sign In CTA.
-  3. Admin can post platform jobs from /hq/c8m4z2/post. Those jobs show
-     a Platform badge across the marketplace.
+What you saw: 10 USDC -> 0.39 EURC. That's the Starlight pool's actual
+math. The pool was seeded with way more USDC than EURC, so the constant-
+product formula gives a brutal rate when you swap into the under-supplied
+side. We can't fix the pool. We CAN make sure you see what's coming
+before you swap.
 
+What this batch does
 
-Files
+  components/claimr/swap-card.tsx           REBUILT
 
-  NEW
-    lib/admin-jobs.ts                                isPlatformJob() helper.
-                                                     Returns true if a job's
-                                                     project address is in the
-                                                     NEXT_PUBLIC_ADMIN_WALLETS
-                                                     allowlist.
+  Reads the pool's actual reserves of USDC and EURC by calling
+  balanceOf(STARLIGHT_POOL_ADDRESS) on each token contract. Refetches
+  every 10 seconds.
 
-    components/claimr/guest-banner.tsx               "You're browsing as a
-                                                     guest" + Sign In CTA.
-                                                     Returns null when
-                                                     authenticated.
+  Computes a live quote using the standard x*y=k AMM formula:
+      amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
+  before you swap. So if you type 10 USDC, you see "0.39 EURC" before
+  hitting the button. No surprise.
 
-    app/hq/c8m4z2/post/page.tsx                      Admin job creation page,
-                                                     reuses PostJobStepper.
+  Shows a rate-quality badge based on the implied slippage from a 1:1
+  peg (both are ~$1 stables):
+      >= 90% efficient   green checkmark, "Good rate"
+      >= 50% efficient   yellow info, "X% slippage from 1:1"
+      <  50% efficient   red warning, "Pool would take X% of your value"
 
-  UPDATED
-    components/claimr/navbar.tsx                     "Launch App" in primary
-                                                     CTA position for all
-                                                     users. Goes to
-                                                     /dashboard/discover.
-                                                     Adds secondary "Sign in"
-                                                     link (sm:inline-block
-                                                     only) for guests.
+  Shows the actual pool reserves below the quote so you understand why
+  the rate is what it is:
+      Pool reserves:  500.00 USDC / 19.50 EURC
 
-    components/claimr/dashboard-sidebar.tsx          Guest mode footer
-                                                     replaces user profile
-                                                     when signed out. Shows
-                                                     "Sign in to claim jobs"
-                                                     CTA. Lock icons on
-                                                     auth-required menu items
-                                                     for guests.
+  When the rate is poor, shows a banner suggesting a smaller amount to
+  try (1% of the destination reserve, where slippage is much lower).
 
-    components/claimr/featured-jobs.tsx              Platform badge next to
-                                                     title when project
-                                                     wallet matches admin
-                                                     allowlist.
-
-    components/claimr/latest-jobs.tsx                Same Platform badge.
-
-    components/claimr/admin-sidebar.tsx              Adds "Post platform job"
-                                                     link, highlighted in
-                                                     #FF2D7A.
-
-    app/dashboard/my-jobs/page.tsx                   GuestBanner at top.
-
-    app/dashboard/wallet/page.tsx                    GuestBanner at top.
-
-    app/dashboard/earnings/page.tsx                  GuestBanner at top.
+  Keeps the "You received X.XXXX EURC" feedback after the swap completes.
 
 
-How browse mode actually works
+How this changes the demo
 
-  - Anyone (no sign-in) can hit /, /dashboard/discover, navigate the
-    sidebar, see the Featured and Latest job sections, read all listings.
-  - Clicking Claim on any job - if not authenticated - redirects to
-    /onboarding?role=creator. That redirect was already in place; no
-    change needed.
-  - Visiting /dashboard/my-jobs as a guest renders the page normally but
-    with the GuestBanner pinned at the top. The list below is empty
-    (since no wallet is connected). Same for wallet, earnings.
-  - Sidebar shows lock icons on My Jobs, Earnings, Wallet, Settings
-    when signed out. Discover is the only unlocked item.
-  - Bottom of sidebar shows a Sign In button instead of the user profile
-    avatar.
+  Before: user types 10 USDC, sees no estimate or a fake 0.918 estimate,
+          swaps, gets burned, feels deceived.
+
+  After:  user types 10 USDC, immediately sees "you'll get ~0.39 EURC,
+          which is a 96% haircut" and a banner saying "try 0.20 USDC
+          instead, where pool depth makes the rate much better."
 
 
-Platform jobs - how the tag works
+Why this can't be fully fixed in Claimr
 
-  No on-chain change. The marketplace components (featured-jobs,
-  latest-jobs) read NEXT_PUBLIC_ADMIN_WALLETS via lib/admin-jobs.ts and
-  compare each job's project address against the allowlist. Any match
-  gets a "Platform" badge.
+  The Starlight pool contract on Arc Testnet
+  (0xB70CBc5F65B2CEC9585cF061ac6b5CD9c462CE53) has imbalanced reserves.
+  Each USDC into the pool can only buy a fraction of an EURC because
+  there's very little EURC to give out. This is an on-chain liquidity
+  problem at the pool, not a UI problem. If you ever own / control the
+  pool or know who does, balancing the reserves is the long-term fix.
 
-  When an admin uses /hq/c8m4z2/post to create a job, the job posts on
-  chain from the admin wallet. Since the admin wallet is in the
-  allowlist, the badge appears automatically. Zero metadata storage.
-
-  Side effect: any non-admin job posted FROM an admin wallet would also
-  be tagged Platform. Since admins post directly with their wallet, this
-  is consistent.
-
-
-Vercel env var format reminder
-
-  NEXT_PUBLIC_ADMIN_WALLETS=0xaaa...,0xbbb...,0xccc...
-  ADMIN_EMAILS=alice@example.com,bob@example.com
-
-  Comma-separated. Case and surrounding spaces don't matter (the parser
-  trims and lowercases). Add as many as you want.
+  Until then, this UI makes the rate visible before you commit, which
+  is the right hackathon move.
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-browse-mode.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-browse-mode.zip -DestinationPath claimr
+  Move-Item C:\Users\Bright\Downloads\claimr-swap-quote.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-swap-quote.zip -DestinationPath claimr
   cd C:\Users\Bright\Documents\GitHub\claimr ; git status
   git add -A
-  git commit -m "feat: browse mode for guests + platform job posting from admin"
+  git commit -m "swap: live pool quote + slippage warning before swap"
   git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Test after deploy
+Test
 
-  Open an incognito window. You should be able to:
-    - Hit / and see Launch App as the primary CTA
-    - Click Launch App, land on /dashboard/discover, see all jobs
-    - Click any job card's Claim button, get bounced to onboarding
-    - Navigate to /dashboard/my-jobs (or wallet, earnings) - see the
-      GuestBanner instead of being redirected away
-    - Click Sign in from the banner or the sidebar footer
-    - Land back on the page you came from after auth
+  /dashboard/wallet, scroll to swap card.
 
-  In a signed-in admin session:
-    - Navigate to /hq/c8m4z2 - see "Post platform job" in the sidebar
-    - Post a test job
-    - In a separate incognito tab, hit /dashboard/discover - the job
-      should show a Platform badge next to its title
+  Type "0.10" (small). You'll see the rate quality badge probably green
+  or fair, and a usable rate.
+
+  Type "10". You'll see red poor-rate warning and the suggested smaller
+  amount.
+
+  Switch the From/To to EURC -> USDC. Now EURC is the depleted side
+  going IN, so even small amounts of EURC will buy LOTS of USDC. The
+  rate quality flips.
 
 
-Strict tsc clean across all changes.
+Strict tsc clean.
