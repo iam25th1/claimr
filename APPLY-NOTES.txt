@@ -1,105 +1,68 @@
-Tour fix v2
+Tour fix v3 - step 6 taskbar collision
 ================================
 
-What broke
+The bug
 
-  1) Step 6 targeted the navbar "?" icon, which has `hidden sm:inline-flex`
-     and is display:none on mobile. The poller waited 3.2s for non-zero
-     dimensions, never found them, then rendered the fallback centered
-     tooltip.
+  Step 6 (Sign in to take action) targeted the sidebar bottom CTA,
+  which sits flush against the bottom of the viewport. Its placement
+  was "right", which positioned the tooltip beside the target with
+  a clamp of vh-220 from the top. That left 220px between the tooltip's
+  top edge and the bottom of the viewport, which sounds like enough
+  but isn't:
 
-  2) Viewport state initialized to {1024, 768} (the SSR default). On
-     mobile devices the centered fallback tooltip computed an offscreen
-     left position based on those wrong dims. The X/Finish buttons
-     ended up off the right edge of the screen, so the user could see
-     a dim overlay but no way to dismiss it.
-
-  3) The tour only had 6 steps and skipped meaningful surfaces like the
-     sign-in CTA at the bottom of the sidebar.
+    - The tooltip card for step 6 is ~250px tall (longer body text).
+    - If the browser window sits flush with the Windows taskbar,
+      vh includes pixels that get visually covered by the taskbar.
+    - Result: the Finish/Back buttons at the bottom of the tooltip
+      ended up overlapping with the taskbar and were unclickable.
 
 
-What this batch ships
+The fix
 
-  Viewport state now reads window.innerWidth/innerHeight via a useState
-    function initializer on first client render. Mobile devices get
-    the correct dims immediately so the fallback tooltip lands within
-    the visible viewport. Plus a centeredTooltipPos helper that clamps
-    to viewport boundaries no matter what.
+  Step 6 now uses placement "top". The tooltip floats above the sidebar
+  CTA target, which has tons of vertical room since the target itself
+  is at the bottom of the screen. Natural reading flow: tooltip up
+  top, highlighted button right below it.
 
-  Step 6 target moved.
-    Old target: [data-tour-id="tour-replay"]   (navbar ? icon)
-    New target: the on-page "Take a tour" button which has no responsive
-    hiding and is always measurable.
+  Right and left placements now use a centered-on-target approach
+  with constants:
+    TOOLTIP_H_ESTIMATE = 240   (conservative card height)
+    BOTTOM_SAFE_MARGIN = 64    (clear of taskbar + any chrome)
 
-  Tour now has 8 steps, covering everything user-visible:
-    1. discover-header  - welcome to Discover
-    2. discover-search  - search and filter
-    3. discover-featured - featured jobs and badges
-    4. discover-latest  - latest jobs + how to claim
-    5. dashboard-sidebar - the navigation overview
-    6. sidebar-cta      - NEW. The bottom of the sidebar where the
-                          sign-in CTA lives. Three div returns in
-                          dashboard-sidebar.tsx now have
-                          data-tour-id="sidebar-cta" so this works
-                          for both guest mode and signed-in users
-    7. tour-replay      - the navbar ? icon as a tip
-    8. tour-trigger     - the on-page Take a tour button (replay CTA)
+  Tooltips can never spill within 64px of the bottom of the viewport,
+  on any platform, regardless of target position.
 
-  Tooltip card adds maxWidth: calc(100vw - 24px) so it can never spill
-    off either edge on narrow screens.
-
-  When a step has no measurable target the previous step's rect now
-    clears so a stale spotlight from step N-1 doesn't bleed into step N.
+  centeredTooltipPos (used when no target is measurable) also picks
+  up the new bottom margin so the fallback tooltip stays clear.
 
 
 Files changed
 
   UPDATED
-    components/claimr/tour-overlay.tsx       Viewport init + clamped
-                                             tooltip + rect-clear on miss
-
-    components/claimr/tour-trigger.tsx       data-tour-id="tour-trigger"
-    components/claimr/discover-tour.tsx      8-step list, step 6 retargeted
-
-  PATCHED via apply script
-    components/claimr/dashboard-sidebar.tsx  Three surgical edits adding
-                                             data-tour-id="sidebar-cta"
-                                             to the bottom area's three
-                                             return branches (skeleton,
-                                             guest CTA, signed-in profile)
+    components/claimr/discover-tour.tsx   step 6 placement -> "top"
+    components/claimr/tour-overlay.tsx    new clamp constants applied
+                                           to right/left/centered paths
 
 
 Apply
 
   Find the zip:
-    Get-ChildItem -Path C:\Users\Bright -Filter "claimr-tour-fix-v2.zip" -Recurse -Depth 4 -ErrorAction SilentlyContinue | Select FullName
+    Get-ChildItem -Path C:\Users\Bright -Filter "claimr-tour-fix-v3.zip" -Recurse -Depth 4 -ErrorAction SilentlyContinue | Select FullName
 
-  Extract (use the actual path from above):
+  Extract:
     cd C:\Users\Bright\Documents\GitHub\claimr
     Expand-Archive -Force "<full-path-from-above>" -DestinationPath .
-    node apply-tour-fix2.js
 
     git add -A
-    git commit -m "fix(tour): mobile-safe viewport, retarget step 6, expand to 8 steps with sidebar CTA"
+    git commit -m "fix(tour): step 6 placement top + taskbar-safe bottom clamps"
     git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Test after deploy
+Test
 
-  Desktop, fresh incognito:
-    Open /
-    Click Explore -> lands on /discover -> welcome modal -> Take the tour
-    Step 1 of 8: page header highlighted crisp
-    Click Next through all 8 steps
-    Step 8 says Finish, click it, tour ends, all UI restored
+  Step 6 (Sign in to take action) should now show its tooltip ABOVE
+  the sidebar bottom CTA, with the highlighted "Sign in to claim jobs"
+  button visible right below the tooltip. The Finish/Back buttons at
+  the bottom of the tooltip should be comfortably above the taskbar.
 
-  Mobile (or narrow window), fresh incognito:
-    Same flow
-    Sidebar steps (5, 6) will render a centered tooltip without a spotlight
-    since the sidebar is `hidden md:flex` - this is expected. The tooltip
-    stays fully on screen and Next/Finish are tappable
-    Step 7 (navbar ? icon) same behavior since it's also hidden on mobile
-
-  Replay:
-    Click the Take a tour button next to the page header -> step 1
-    Click the ? icon in the navbar -> step 1
+  Walk through all 8 steps to confirm nothing else regressed.

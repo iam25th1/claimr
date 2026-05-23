@@ -25,6 +25,13 @@ const TOOLTIP_W = 320;
 const TOOLTIP_GAP = 16;
 const PADDING = 8;
 
+// Conservative estimate of tooltip card height plus a generous bottom
+// margin. Used to clamp tooltip top so the card never sits flush with
+// the bottom of the viewport (where the Windows taskbar or mobile
+// browser chrome could obscure the Finish/Close buttons).
+const TOOLTIP_H_ESTIMATE = 240;
+const BOTTOM_SAFE_MARGIN = 64;
+
 // How aggressively we hunt for a target element that isn't measured yet.
 // 80ms * 40 = 3.2 seconds of patience, then we give up and render the
 // tooltip centered without a spotlight.
@@ -80,23 +87,33 @@ function tooltipPosition(
     };
   }
   if (placement === "right") {
+    // Vertically center on target, then clamp top so the whole card
+    // stays above the bottom safe zone (away from the taskbar).
+    const centeredTop = rect.top + rect.height / 2 - TOOLTIP_H_ESTIMATE / 2;
+    const maxTop = vh - TOOLTIP_H_ESTIMATE - BOTTOM_SAFE_MARGIN;
     return {
-      top: Math.min(vh - 220, rect.top),
+      top: Math.max(12, Math.min(maxTop, centeredTop)),
       left: Math.min(vw - TOOLTIP_W - 12, rect.left + rect.width + TOOLTIP_GAP),
     };
   }
   // left
+  const centeredTop = rect.top + rect.height / 2 - TOOLTIP_H_ESTIMATE / 2;
+  const maxTop = vh - TOOLTIP_H_ESTIMATE - BOTTOM_SAFE_MARGIN;
   return {
-    top: Math.min(vh - 220, rect.top),
+    top: Math.max(12, Math.min(maxTop, centeredTop)),
     left: Math.max(12, rect.left - TOOLTIP_W - TOOLTIP_GAP),
   };
 }
 
 // Centered fallback when no target is measurable. Clamped to viewport so
-// the Close/Finish buttons are always tappable, including on mobile.
+// the Close/Finish buttons are always tappable, including on mobile and
+// on Windows where the taskbar can encroach on the browser's bottom edge.
 function centeredTooltipPos(vw: number, vh: number) {
   const left = Math.max(12, Math.min(vw - TOOLTIP_W - 12, vw / 2 - TOOLTIP_W / 2));
-  const top = Math.max(12, Math.min(vh - 220, vh / 2 - 100));
+  const top = Math.max(
+    12,
+    Math.min(vh - TOOLTIP_H_ESTIMATE - BOTTOM_SAFE_MARGIN, vh / 2 - 100)
+  );
   return { top, left };
 }
 

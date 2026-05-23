@@ -37,8 +37,8 @@ const DISCOVER_STEPS: TourStep[] = [
   {
     target: '[data-tour-id="sidebar-cta"]',
     title: "Sign in to take action",
-    body: "You can browse Claimr as a guest, but claiming jobs and getting paid both need a signed-in wallet. The button down here is the fastest way to set up an account.",
-    placement: "right",
+    body: "You can browse Claimr as a guest, but claiming jobs and getting paid both need a signed-in wallet. The button right below this tooltip is the fastest way to set up an account.",
+    placement: "top",
   },
   {
     target: '[data-tour-id="tour-replay"]',
