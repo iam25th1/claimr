@@ -146,6 +146,14 @@ export function OnboardingCards() {
   // entirely; the user signs in with their existing wallet. Goes straight
   // to the destination dashboard - no profile step, no Circle setup.
   const handleConnectWallet = async () => {
+    // Pre-flight: is there even an injected wallet to connect to?
+    if (typeof window === "undefined" || !(window as { ethereum?: unknown }).ethereum) {
+      setError(
+        "No browser wallet detected. Install MetaMask (or Rabby / Brave Wallet / Coinbase Wallet) and refresh, then try again."
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -153,7 +161,21 @@ export function OnboardingCards() {
       // Auth state updates via wagmi; the redirect effect at the top of
       // the component picks it up and routes the user away.
     } catch (err: any) {
-      setError(err?.message ?? "Could not connect wallet.");
+      // Translate wagmi/core's terse errors into something a user can act on.
+      const raw = err?.message ?? "";
+      let friendly = "Could not connect wallet.";
+      if (/provider not found|no provider/i.test(raw)) {
+        friendly =
+          "No browser wallet detected. Install MetaMask or another browser wallet and refresh the page.";
+      } else if (/user rejected|user denied|reject/i.test(raw)) {
+        friendly = "Wallet connection was cancelled.";
+      } else if (/already pending/i.test(raw)) {
+        friendly =
+          "A wallet connection request is already open. Check your MetaMask extension.";
+      } else if (raw) {
+        friendly = raw;
+      }
+      setError(friendly);
     } finally {
       setSubmitting(false);
     }
@@ -394,6 +416,17 @@ function EmailStep({
   onBack?: () => void;
 }) {
   const isSignup = mode === "signup";
+
+  // Detect injected wallet after mount (SSR-safe). If missing, swap the
+  // Connect button for an Install link so users don't hit "Provider not
+  // found" the moment they click.
+  const [hasInjectedWallet, setHasInjectedWallet] = useState<boolean | null>(
+    null
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setHasInjectedWallet(!!(window as { ethereum?: unknown }).ethereum);
+  }, []);
   return (
     <div>
       <Heading
@@ -485,18 +518,33 @@ function EmailStep({
         <div className="h-px flex-1 bg-white/10" />
       </div>
 
-      <button
-        type="button"
-        onClick={onConnectWallet}
-        disabled={submitting}
-        className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <Wallet className="h-4 w-4 text-[#F6851B]" />
-        Connect MetaMask
-      </button>
+      {hasInjectedWallet === false ? (
+        <a
+          href="https://metamask.io/download/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20"
+        >
+          <Wallet className="h-4 w-4 text-[#F6851B]" />
+          Install MetaMask
+          <ArrowRight className="h-3.5 w-3.5" />
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={onConnectWallet}
+          disabled={submitting || hasInjectedWallet === null}
+          className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <Wallet className="h-4 w-4 text-[#F6851B]" />
+          Connect MetaMask
+        </button>
+      )}
+
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        Use your existing wallet. No email, no PIN, one click to sign each
-        transaction.
+        {hasInjectedWallet === false
+          ? "MetaMask (or another browser wallet) is required for wallet sign-in."
+          : "Use your existing wallet. No email, no PIN, one click to sign each transaction."}
       </p>
     </div>
   );
