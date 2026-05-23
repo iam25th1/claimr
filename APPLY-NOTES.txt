@@ -1,86 +1,141 @@
-Swap card - now actually useful
-
-What you saw: 10 USDC -> 0.39 EURC. That's the Starlight pool's actual
-math. The pool was seeded with way more USDC than EURC, so the constant-
-product formula gives a brutal rate when you swap into the under-supplied
-side. We can't fix the pool. We CAN make sure you see what's coming
-before you swap.
+MetaMask connect + PIN-reduction reality check
 
 What this batch does
 
-  components/claimr/swap-card.tsx           REBUILT
+  Adds MetaMask (and any injected wallet - Rabby, Brave, Coinbase Wallet
+  extension, etc.) as an alternative sign-in option. Users now have two
+  ways to authenticate:
 
-  Reads the pool's actual reserves of USDC and EURC by calling
-  balanceOf(STARLIGHT_POOL_ADDRESS) on each token contract. Refetches
-  every 10 seconds.
+    EMAIL FLOW (existing, unchanged)
+      Sign up with email -> Circle creates a custodial-ish wallet ->
+      Set a PIN -> PIN per transaction. Strong security, no extensions
+      required, friendly to non-crypto users. But yes, lots of PIN entry.
 
-  Computes a live quote using the standard x*y=k AMM formula:
-      amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
-  before you swap. So if you type 10 USDC, you see "0.39 EURC" before
-  hitting the button. No surprise.
-
-  Shows a rate-quality badge based on the implied slippage from a 1:1
-  peg (both are ~$1 stables):
-      >= 90% efficient   green checkmark, "Good rate"
-      >= 50% efficient   yellow info, "X% slippage from 1:1"
-      <  50% efficient   red warning, "Pool would take X% of your value"
-
-  Shows the actual pool reserves below the quote so you understand why
-  the rate is what it is:
-      Pool reserves:  500.00 USDC / 19.50 EURC
-
-  When the rate is poor, shows a banner suggesting a smaller amount to
-  try (1% of the destination reserve, where slippage is much lower).
-
-  Keeps the "You received X.XXXX EURC" feedback after the swap completes.
+    WALLET FLOW (new)
+      Click "Connect MetaMask" -> MetaMask popup -> Approve -> Done.
+      One click to sign each transaction. No PIN. No email. No Circle
+      setup. Use your existing wallet.
 
 
-How this changes the demo
+Files in this batch
 
-  Before: user types 10 USDC, sees no estimate or a fake 0.918 estimate,
-          swaps, gets burned, feels deceived.
+  NEW LIB
+    lib/wagmi.ts                            REPLACED. Adds the injected
+                                            connector so wagmi can talk
+                                            to MetaMask.
 
-  After:  user types 10 USDC, immediately sees "you'll get ~0.39 EURC,
-          which is a 96% haircut" and a banner saying "try 0.20 USDC
-          instead, where pool depth makes the rate much better."
+    lib/auth.ts                             REPLACED. AuthUser gains a
+                                            `provider: "circle" | "wallet"`
+                                            field. AuthContextValue gains
+                                            a `connectWallet()` method.
+                                            Email can now be null (wallet
+                                            users don't have one).
+
+    lib/useCircleWrite.ts                   REPLACED. Renamed misleading
+                                            internals: hook is still
+                                            exported as useCircleWrite for
+                                            compat. Internally it now
+                                            branches on user.provider:
+                                              "wallet"  - wagmi
+                                                          writeContractAsync
+                                                          + receipt wait
+                                              "circle"  - existing PIN
+                                                          challenge flow
+                                            Same API to callers. Every
+                                            component that already used
+                                            useCircleWrite now works for
+                                            both auth modes with zero
+                                            changes.
+
+  PROVIDERS
+    app/providers.tsx                       REORDERED. WagmiProvider now
+                                            wraps AuthProvider so the
+                                            auth context can use wagmi
+                                            hooks (useAccount, useConnect,
+                                            useDisconnect). Auth state
+                                            now merges:
+                                              Circle session (cookie) OR
+                                              wallet connection (wagmi)
+                                            Circle takes precedence if
+                                            both happen to be active.
+
+  UI
+    components/claimr/onboarding-cards.tsx  PATCHED. EmailStep now has a
+                                            divider and "Connect MetaMask"
+                                            button below the email form.
+                                            Wallet flow skips verifying /
+                                            wallet / profile steps and
+                                            redirects straight to dashboard.
 
 
-Why this can't be fully fixed in Claimr
+The PIN question, honestly
 
-  The Starlight pool contract on Arc Testnet
-  (0xB70CBc5F65B2CEC9585cF061ac6b5CD9c462CE53) has imbalanced reserves.
-  Each USDC into the pool can only buy a fraction of an EURC because
-  there's very little EURC to give out. This is an on-chain liquidity
-  problem at the pool, not a UI problem. If you ever own / control the
-  pool or know who does, balancing the reserves is the long-term fix.
+The PIN-per-transaction is Circle's design. It's how user-controlled
+wallets work: every signature requires the user to prove they're the
+one authorizing. There's no setting in Circle's SDK that bypasses this
+without giving up the security model.
 
-  Until then, this UI makes the rate visible before you commit, which
-  is the right hackathon move.
+What this batch DOES for the PIN problem:
+  Users who switch to MetaMask flow stop having PIN entries entirely.
+  MetaMask shows its own confirmation popup per transaction (typically
+  one click each), which is meaningfully faster than the PIN sheet.
+
+What this batch does NOT do:
+  Circle users still face PIN-per-tx. For a multi-slot post with 5
+  slots, that's still 1 approve + 5 postJobs = 6 PIN entries.
+
+Genuine paths to reduce PIN further for Circle users (NOT in this batch):
+  A.  Approve-max pattern. On the first swap or first post, approve
+      uint256.max instead of the exact amount. Subsequent transactions
+      skip the approve step entirely. Saves 1 PIN per repeat operation.
+      Easy to add as a follow-up.
+  B.  Contract-level batching. Add a `postJobs(...)` function to the
+      Claimr escrow contract that takes an array and posts N jobs in
+      one transaction. Drops slot posting from N+1 to 2 PIN entries
+      (1 approve + 1 batch). Requires re-deploying the contract.
+  C.  Circle session features. If Circle ever adds a "remember PIN for
+      session" mode, we plug into it. Currently no such mode exists in
+      the W3S SDK.
 
 
 Apply
 
-  Move-Item C:\Users\Bright\Downloads\claimr-swap-quote.zip C:\Users\Bright\Documents\GitHub\
-  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-swap-quote.zip -DestinationPath claimr
+  Move-Item C:\Users\Bright\Downloads\claimr-metamask.zip C:\Users\Bright\Documents\GitHub\
+  cd C:\Users\Bright\Documents\GitHub ; Expand-Archive -Force claimr-metamask.zip -DestinationPath claimr
   cd C:\Users\Bright\Documents\GitHub\claimr ; git status
   git add -A
-  git commit -m "swap: live pool quote + slippage warning before swap"
+  git commit -m "auth: MetaMask connect as alternative to Circle email flow"
   git push https://iam25th1@github.com/iam25th1/claimr.git
 
 
-Test
+Test after deploy
 
-  /dashboard/wallet, scroll to swap card.
+  WALLET FLOW
+  1. Open in incognito with MetaMask installed
+  2. Click Launch App -> /dashboard/discover
+  3. Click any Claim button -> bounced to /onboarding
+  4. Scroll past email field, click Connect MetaMask
+  5. Approve in MetaMask popup
+  6. You land on /dashboard/discover, signed in as wallet user
+  7. Click Claim on a job -> MetaMask popup pops (no PIN sheet)
+  8. Confirm tx -> done, single click each
 
-  Type "0.10" (small). You'll see the rate quality badge probably green
-  or fair, and a usable rate.
+  EMAIL FLOW (unchanged)
+  Existing flow still works identically for Circle users.
 
-  Type "10". You'll see red poor-rate warning and the suggested smaller
-  amount.
-
-  Switch the From/To to EURC -> USDC. Now EURC is the depleted side
-  going IN, so even small amounts of EURC will buy LOTS of USDC. The
-  rate quality flips.
+  COEXISTENCE
+  If a user signs in with email AND happens to have MetaMask connected
+  in the same browser, the Circle session takes precedence. Logging
+  out clears both.
 
 
-Strict tsc clean.
+Notes for admin features
+
+  Admin gates are still email-based (ADMIN_EMAILS env). MetaMask users
+  cannot reach admin pages even if their wallet is in
+  NEXT_PUBLIC_ADMIN_WALLETS, because the server-side check reads the
+  Circle session cookie's email field. If you want wallet-based admin,
+  that's a SIWE (Sign-In with Ethereum) integration - separate batch.
+
+
+Strict tsc clean across all changes.

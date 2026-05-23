@@ -2,9 +2,14 @@
 
 import { createContext, useContext } from "react";
 
+// "circle"  - Email signup, server-side session, PIN per transaction
+// "wallet"  - MetaMask (or any injected wallet), no email, signs in their wallet
+export type AuthProviderType = "circle" | "wallet";
+
 export interface AuthUser {
-  email: string;
-  walletAddress: string | null; // null between PIN setup completion and wallet fetch
+  email: string | null; // null for wallet-only users
+  walletAddress: string | null; // null briefly between Circle PIN setup and wallet fetch
+  provider: AuthProviderType;
 }
 
 export interface AuthContextValue {
@@ -12,6 +17,7 @@ export interface AuthContextValue {
   authenticated: boolean;
   user: AuthUser | null;
   signUp: (email: string) => Promise<void>;
+  connectWallet: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -24,6 +30,10 @@ export const STUB_AUTH: AuthContextValue = {
   user: null,
   signUp: async () => {
     if (typeof window !== "undefined") window.alert(NO_AUTH_MESSAGE);
+  },
+  connectWallet: async () => {
+    if (typeof window !== "undefined")
+      window.alert("Wallet connect requires the app to be running.");
   },
   logout: async () => {},
 };

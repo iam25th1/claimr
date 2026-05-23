@@ -2,18 +2,34 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
+import {
+  WagmiProvider,
+  useAccount,
+  useConnect,
+  useDisconnect,
+} from "wagmi";
+import { injected } from "wagmi/connectors";
 import { config } from "@/lib/wagmi";
-import { AuthContext, type AuthContextValue, type AuthUser } from "@/lib/auth";
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthUser,
+} from "@/lib/auth";
 import { executeChallenge } from "@/lib/circle-client";
 
 const queryClient = new QueryClient();
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [circleUser, setCircleUser] = useState<AuthUser | null>(null);
 
-  // On mount, check existing session via the httpOnly cookie.
+  // Wallet (MetaMask / injected) connection state from wagmi.
+  const { address: walletAddress, isConnected: isWalletConnected } =
+    useAccount();
+  const { connectAsync } = useConnect();
+  const { disconnectAsync } = useDisconnect();
+
+  // On mount, check for an existing Circle session via httpOnly cookie.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -23,9 +39,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           if (data?.email) {
-            setUser({
+            setCircleUser({
               email: data.email,
               walletAddress: data.walletAddress ?? null,
+              provider: "circle",
             });
           }
         }
@@ -41,8 +58,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string) => {
-    // 1. Backend creates the Circle user (idempotent), issues a session token,
-    //    opens a PIN+wallet challenge if needed.
+    // 1. Backend creates the Circle user (idempotent), issues a session
+    //    token, opens a PIN+wallet challenge if needed.
     const onboard = await fetch("/api/circle/onboard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,9 +67,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!onboard.ok) {
       const err = await onboard.json().catch(() => ({}));
-      // Surface the actual error message from the API so the UI can show
-      // something more useful than "Internal onboarding error". Falls back
-      // to a status-based message if the body didn't include `error`.
       const apiError =
         err?.error ??
         `Onboarding failed (HTTP ${onboard.status}). Check that CIRCLE_API_KEY is set in Vercel env vars.`;
@@ -61,20 +75,18 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     const { userToken, encryptionKey, challengeId, alreadyInitialized } =
       await onboard.json();
 
-    // 2. Run the PIN+wallet challenge only when one was issued. Returning
-    //    users with an existing PIN won't get a challenge - skip directly
-    //    to finalize. This was a bug previously: executeChallenge(null) threw.
     if (challengeId && !alreadyInitialized) {
       try {
         await executeChallenge(challengeId, { userToken, encryptionKey });
-      } catch (err: any) {
-        // Cancel inside the PIN sheet is the most common reason this rejects.
-        const msg = err?.message ?? "PIN entry cancelled.";
+      } catch (err) {
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "PIN entry cancelled.";
         throw new Error(msg);
       }
     }
 
-    // 3. Backend records the session cookie and fetches the wallet (new or existing).
     const finalize = await fetch("/api/circle/finalize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,19 +94,57 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!finalize.ok) {
       const err = await finalize.json().catch(() => ({}));
-      throw new Error(err?.error ?? `Finalize failed (HTTP ${finalize.status}).`);
+      throw new Error(
+        err?.error ?? `Finalize failed (HTTP ${finalize.status}).`
+      );
     }
     const data = await finalize.json();
-    setUser({
+    setCircleUser({
       email: data.email,
       walletAddress: data.walletAddress ?? null,
+      provider: "circle",
     });
   }, []);
 
+  // Connect MetaMask (or any injected wallet). No PIN, no Circle SDK. The
+  // injected connector pops the wallet's own UI for approval. After that
+  // the user is "signed in" client-side; useAccount tracks the address.
+  const connectWallet = useCallback(async () => {
+    try {
+      await connectAsync({ connector: injected() });
+    } catch (err) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Wallet connect cancelled.";
+      throw new Error(msg);
+    }
+  }, [connectAsync]);
+
   const logout = useCallback(async () => {
-    await fetch("/api/circle/logout", { method: "POST" }).catch(() => {});
-    setUser(null);
-  }, []);
+    // Disconnect either or both, whichever is active.
+    if (circleUser) {
+      await fetch("/api/circle/logout", { method: "POST" }).catch(() => {});
+      setCircleUser(null);
+    }
+    if (isWalletConnected) {
+      await disconnectAsync().catch(() => {});
+    }
+  }, [circleUser, isWalletConnected, disconnectAsync]);
+
+  // Merge the two possible auth sources. Circle takes precedence if both
+  // happen to be active in the same session.
+  const user: AuthUser | null = useMemo(() => {
+    if (circleUser) return circleUser;
+    if (isWalletConnected && walletAddress) {
+      return {
+        email: null,
+        walletAddress,
+        provider: "wallet",
+      };
+    }
+    return null;
+  }, [circleUser, isWalletConnected, walletAddress]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -102,20 +152,25 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       authenticated: !!user,
       user,
       signUp,
+      connectWallet,
       logout,
     }),
-    [ready, user, signUp, logout]
+    [ready, user, signUp, connectWallet, logout]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  );
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  // WagmiProvider must wrap AuthProvider so that AuthProvider can use
+  // useAccount, useConnect, useDisconnect hooks.
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={config}>{children}</WagmiProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={config}>
+        <AuthProvider>{children}</AuthProvider>
+      </WagmiProvider>
+    </QueryClientProvider>
   );
 }

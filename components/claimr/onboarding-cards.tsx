@@ -58,7 +58,7 @@ const SIGNIN_STEPS: Step[] = ["email", "verifying"];
 export function OnboardingCards() {
   const router = useRouter();
   const params = useSearchParams();
-  const { ready, authenticated, user, signUp } = useAuth();
+  const { ready, authenticated, user, signUp, connectWallet } = useAuth();
 
   const urlMode = params.get("mode") === "signin" ? "signin" : "signup";
   const urlRole =
@@ -142,6 +142,23 @@ export function OnboardingCards() {
     }
   };
 
+  // MetaMask / injected wallet alternative. Bypasses the email + PIN flow
+  // entirely; the user signs in with their existing wallet. Goes straight
+  // to the destination dashboard - no profile step, no Circle setup.
+  const handleConnectWallet = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await connectWallet();
+      // Auth state updates via wagmi; the redirect effect at the top of
+      // the component picks it up and routes the user away.
+    } catch (err: any) {
+      setError(err?.message ?? "Could not connect wallet.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleFinish = () => {
     router.replace(role === "project" ? "/project" : "/dashboard/discover");
   };
@@ -173,6 +190,7 @@ export function OnboardingCards() {
             submitting={submitting}
             error={error}
             onSubmit={handleEmailSubmit}
+            onConnectWallet={handleConnectWallet}
             onBack={
               mode === "signup" && !urlRole ? () => setStep("role") : undefined
             }
@@ -362,6 +380,7 @@ function EmailStep({
   submitting,
   error,
   onSubmit,
+  onConnectWallet,
   onBack,
 }: {
   mode: Mode;
@@ -371,6 +390,7 @@ function EmailStep({
   submitting: boolean;
   error: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  onConnectWallet: () => void;
   onBack?: () => void;
 }) {
   const isSignup = mode === "signup";
@@ -455,6 +475,29 @@ function EmailStep({
           </button>
         </div>
       </form>
+
+      {/* Wallet connect alternative. Skips the email + PIN flow entirely. */}
+      <div className="mt-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/10" />
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          or
+        </span>
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+
+      <button
+        type="button"
+        onClick={onConnectWallet}
+        disabled={submitting}
+        className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-foreground transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        <Wallet className="h-4 w-4 text-[#F6851B]" />
+        Connect MetaMask
+      </button>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        Use your existing wallet. No email, no PIN, one click to sign each
+        transaction.
+      </p>
     </div>
   );
 }
