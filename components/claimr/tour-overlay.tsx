@@ -52,15 +52,16 @@ function pickPlacement(
 function tooltipPosition(
   rect: Rect,
   placement: "top" | "bottom" | "left" | "right",
-  vw: number
+  vw: number,
+  vh: number
 ): { top: number; left: number } {
   if (placement === "bottom") {
     return {
-      top: rect.top + rect.height + TOOLTIP_GAP,
+      top: Math.min(vh - 220, rect.top + rect.height + TOOLTIP_GAP),
       left: Math.max(
-        16,
+        12,
         Math.min(
-          vw - TOOLTIP_W - 16,
+          vw - TOOLTIP_W - 12,
           rect.left + rect.width / 2 - TOOLTIP_W / 2
         )
       ),
@@ -68,11 +69,11 @@ function tooltipPosition(
   }
   if (placement === "top") {
     return {
-      top: rect.top - TOOLTIP_GAP - 160,
+      top: Math.max(12, rect.top - TOOLTIP_GAP - 200),
       left: Math.max(
-        16,
+        12,
         Math.min(
-          vw - TOOLTIP_W - 16,
+          vw - TOOLTIP_W - 12,
           rect.left + rect.width / 2 - TOOLTIP_W / 2
         )
       ),
@@ -80,15 +81,23 @@ function tooltipPosition(
   }
   if (placement === "right") {
     return {
-      top: rect.top,
-      left: rect.left + rect.width + TOOLTIP_GAP,
+      top: Math.min(vh - 220, rect.top),
+      left: Math.min(vw - TOOLTIP_W - 12, rect.left + rect.width + TOOLTIP_GAP),
     };
   }
   // left
   return {
-    top: rect.top,
-    left: Math.max(16, rect.left - TOOLTIP_W - TOOLTIP_GAP),
+    top: Math.min(vh - 220, rect.top),
+    left: Math.max(12, rect.left - TOOLTIP_W - TOOLTIP_GAP),
   };
+}
+
+// Centered fallback when no target is measurable. Clamped to viewport so
+// the Close/Finish buttons are always tappable, including on mobile.
+function centeredTooltipPos(vw: number, vh: number) {
+  const left = Math.max(12, Math.min(vw - TOOLTIP_W - 12, vw / 2 - TOOLTIP_W / 2));
+  const top = Math.max(12, Math.min(vh - 220, vh / 2 - 100));
+  return { top, left };
 }
 
 export function TourOverlay({ steps }: { steps: TourStep[] }) {
@@ -102,9 +111,15 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   }, [steps.length, setTotalSteps]);
 
   const [rect, setRect] = useState<Rect | null>(null);
-  const [viewport, setViewport] = useState<{ w: number; h: number }>({
-    w: 1024,
-    h: 768,
+
+  // Read real window dims on first render so the fallback tooltip
+  // (when there's no target) renders within the visible viewport
+  // instead of offscreen at the SSR default of 1024x768.
+  const [viewport, setViewport] = useState<{ w: number; h: number }>(() => {
+    if (typeof window !== "undefined") {
+      return { w: window.innerWidth, h: window.innerHeight };
+    }
+    return { w: 1024, h: 768 };
   });
 
   // Find target and measure. Polls until the element is both present
@@ -124,7 +139,8 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
       if (!el) return false;
 
       const r = el.getBoundingClientRect();
-      // Element exists but isn't laid out yet (zero-size). Keep polling.
+      // Element exists but isn't laid out (zero size, eg display:none).
+      // Keep polling so a target that comes online later still gets found.
       if (r.width < 1 || r.height < 1) return false;
 
       const offscreen =
@@ -135,7 +151,6 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
 
       if (offscreen) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        // After scrolling, give the browser a frame to settle and remeasure.
         requestAnimationFrame(() => {
           const r2 = el.getBoundingClientRect();
           setRect({
@@ -159,8 +174,11 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
 
     // Try once immediately. If it lands, just wire up the watchers.
     let pollTimer: ReturnType<typeof setInterval> | null = null;
-    if (!measure()) {
-      // Target not measurable yet. Poll for it.
+    const found = measure();
+    if (!found) {
+      // Reset stale rect so the previous step's spotlight doesn't linger
+      // while we poll for the new one.
+      setRect(null);
       let attempts = 0;
       pollTimer = setInterval(() => {
         attempts += 1;
@@ -206,8 +224,8 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
       : "bottom";
 
   const tooltipPos = rect
-    ? tooltipPosition(rect, placement, viewport.w)
-    : { top: viewport.h / 2 - 100, left: viewport.w / 2 - TOOLTIP_W / 2 };
+    ? tooltipPosition(rect, placement, viewport.w, viewport.h)
+    : centeredTooltipPos(viewport.w, viewport.h);
 
   return (
     <div className="fixed inset-0 z-[55] pointer-events-none">
@@ -236,7 +254,6 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           fill="rgba(0,0,0,0.72)"
           mask="url(#tour-cutout)"
         />
-        {/* Animated outline around the target */}
         {rect && (
           <rect
             x={rect.left}
@@ -254,13 +271,13 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
         )}
       </svg>
 
-      {/* Tooltip card, always on top of the overlay. */}
       <div
         className="absolute pointer-events-auto"
         style={{
           top: tooltipPos.top,
           left: tooltipPos.left,
           width: TOOLTIP_W,
+          maxWidth: "calc(100vw - 24px)",
         }}
       >
         <div className="rounded-xl border border-white/15 bg-[#0f0f12]/95 backdrop-blur-xl shadow-2xl">

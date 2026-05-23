@@ -14,6 +14,7 @@ export function TourTrigger({ className }: Props) {
     <button
       type="button"
       onClick={startTour}
+      data-tour-id="tour-trigger"
       className={`inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-sm font-medium text-foreground hover:bg-white/10 hover:border-white/20 transition-colors ${
         className ?? ""
       }`}

@@ -38,12 +38,12 @@ function UserProfileOrGuestCta() {
   const router = useRouter();
 
   if (!mounted) {
-    return <div className="border-t border-border/50 p-4 h-[72px]" />;
+    return <div data-tour-id="sidebar-cta" className="border-t border-border/50 p-4 h-[72px]" />;
   }
 
   if (!authenticated) {
     return (
-      <div className="border-t border-border/50 p-4">
+      <div data-tour-id="sidebar-cta" className="border-t border-border/50 p-4">
         <p className="text-xs text-muted-foreground mb-2">
           You're browsing as a guest
         </p>
@@ -72,7 +72,7 @@ function UserProfileOrGuestCta() {
   };
 
   return (
-    <div className="border-t border-border/50 p-4">
+    <div data-tour-id="sidebar-cta" className="border-t border-border/50 p-4">
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#FF2D7A] to-[#2D6EFF] flex items-center justify-center text-sm font-bold text-white shrink-0">
           {avatarLetter}
